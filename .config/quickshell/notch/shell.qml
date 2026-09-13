@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -32,6 +33,23 @@ ShellRoot {
 
         function close() {
             ShellState.close();
+        }
+
+        function lock() {
+            ShellState.locked = true;
+        }
+    }
+
+    LockScreen {}
+
+    // Region selection overlay: one per screen, driven by ShellState so the
+    // screenshot panel can consume the geometry.
+    Variants {
+        model: Quickshell.screens
+
+        RegionSelector {
+            required property var modelData
+            screen: modelData
         }
     }
 
@@ -69,7 +87,11 @@ ShellRoot {
             // set the layer-shell property directly.
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "notch"
-            WlrLayershell.keyboardFocus: ShellState.expanded ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            WlrLayershell.keyboardFocus: (ShellState.expanded && !ShellState.capturing) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+            // Hide during capture (so it cannot land in a screenshot) and while
+            // the session is locked (the lock surface should own the screen).
+            visible: !ShellState.capturing && !ShellState.locked
 
             // Clicks pass through everywhere except the island
             mask: Region {
@@ -101,28 +123,40 @@ ShellRoot {
 
             function activePanel() {
                 switch (ShellState.panel) {
-                case "launcher":  return launcherPanel;
-                case "clipboard": return clipboardPanel;
-                case "bookmarks": return bookmarksPanel;
+                case "launcher":   return launcherPanel;
+                case "clipboard":  return clipboardPanel;
+                case "bookmarks":  return bookmarksPanel;
+                case "screenshot": return screenshotPanel;
+                case "power":      return powerPanel;
                 }
                 return null;
             }
 
             // ---------------- island ----------------
-            Rectangle {
+            Item {
                 id: island
 
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
-                anchors.topMargin: ShellState.expanded ? 9 : 0
 
                 width: ShellState.expanded ? ShellState.expandedWidth : ShellState.collapsedWidth
                 height: ShellState.targetHeight
 
-                radius: ShellState.expanded ? 18 : 15
-                color: ShellState.expanded ? Theme.crust : "#000000"
-                border.width: 1
-                border.color: ShellState.expanded ? Theme.surface0 : "transparent"
+                // Notch geometry: `flare` is the concave shoulder that spreads
+                // out to the screen edge at the top, `foot` is the convex radius
+                // on the bottom corners. The body itself stays `width` wide.
+                property real flare: ShellState.expanded ? 16 : 10
+                property real foot: ShellState.expanded ? 16 : 12
+                property color fill: ShellState.expanded ? Theme.crust : "#000000"
+                property color line: ShellState.expanded ? Theme.hairline : "transparent"
+
+                // Hidden during capture so it never lands in the shot
+                opacity: ShellState.capturing ? 0 : 1
+
+                Behavior on opacity {
+                    enabled: !ShellState.capturing
+                    NumberAnimation { duration: Theme.animFast }
+                }
 
                 Behavior on width {
                     NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
@@ -130,11 +164,81 @@ ShellRoot {
                 Behavior on height {
                     NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
                 }
-                Behavior on anchors.topMargin {
+                Behavior on flare {
                     NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
                 }
-                Behavior on color {
+                Behavior on foot {
+                    NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
+                }
+                Behavior on fill {
                     ColorAnimation { duration: Theme.animFast }
+                }
+
+                // One path for the whole notch so the shoulders, straight sides
+                // and rounded feet share a single fill and hairline outline.
+                Shape {
+                    id: islandShape
+
+                    x: -island.flare
+                    y: 0
+                    width: island.width + island.flare * 2
+                    height: island.height
+                    antialiasing: true
+
+                    readonly property real bw: island.width
+                    readonly property real r: island.flare
+                    readonly property real rb: island.foot
+
+                    ShapePath {
+                        fillColor: island.fill
+                        strokeColor: island.line
+                        strokeWidth: 1
+                        joinStyle: ShapePath.RoundJoin
+
+                        startX: 0
+                        startY: 0
+
+                        // top edge, shoulder tip to shoulder tip
+                        PathLine { x: islandShape.bw + islandShape.r * 2; y: 0 }
+
+                        // right shoulder: curves back in to the body
+                        PathQuad {
+                            x: islandShape.bw + islandShape.r
+                            y: islandShape.r
+                            controlX: islandShape.bw + islandShape.r
+                            controlY: 0
+                        }
+
+                        // right side down to the foot
+                        PathLine { x: islandShape.bw + islandShape.r; y: islandShape.height - islandShape.rb }
+
+                        PathQuad {
+                            x: islandShape.bw + islandShape.r - islandShape.rb
+                            y: islandShape.height
+                            controlX: islandShape.bw + islandShape.r
+                            controlY: islandShape.height
+                        }
+
+                        // bottom edge
+                        PathLine { x: islandShape.r + islandShape.rb; y: islandShape.height }
+
+                        PathQuad {
+                            x: islandShape.r
+                            y: islandShape.height - islandShape.rb
+                            controlX: islandShape.r
+                            controlY: islandShape.height
+                        }
+
+                        // left side up, then the left shoulder out to the edge
+                        PathLine { x: islandShape.r; y: islandShape.r }
+
+                        PathQuad {
+                            x: 0
+                            y: 0
+                            controlX: islandShape.r
+                            controlY: 0
+                        }
+                    }
                 }
 
                 // ---------------- collapsed clock ----------------
@@ -186,11 +290,11 @@ ShellRoot {
                 // ---------------- expanded body ----------------
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 14
-                    anchors.topMargin: 13
-                    anchors.bottomMargin: 12
-                    spacing: 9
+                    anchors.leftMargin: Theme.padH
+                    anchors.rightMargin: Theme.padH
+                    anchors.topMargin: Theme.padV
+                    anchors.bottomMargin: Theme.padV
+                    spacing: 0
                     opacity: ShellState.expanded ? 1 : 0
                     visible: opacity > 0
 
@@ -221,6 +325,22 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "bookmarks"
+                    }
+
+                    ScreenshotPanel {
+                        id: screenshotPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "screenshot"
+                    }
+
+                    PowerPanel {
+                        id: powerPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "power"
                     }
                 }
             }

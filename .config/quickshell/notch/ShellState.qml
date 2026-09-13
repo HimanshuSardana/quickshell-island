@@ -3,25 +3,61 @@ import QtQuick
 import Quickshell
 
 Singleton {
-    // "clock" | "launcher" | "clipboard" | "bookmarks"
+    // "clock" | "launcher" | "clipboard" | "bookmarks" | "screenshot" | "power"
     property string panel: "clock"
     readonly property bool expanded: panel !== "clock"
 
-    readonly property int collapsedWidth: 112
-    readonly property int collapsedHeight: 30
+    // True while a screenshot is being taken: the island hides itself so it
+    // does not end up in the capture, and the surface unmaps so it cannot
+    // swallow the region drag.
+    property bool capturing: false
+
+    // Session lock (ext-session-lock-v1, driven by LockScreen.qml)
+    property bool locked: false
+
+    // The screenshot panel resizes itself between its two stages.
+    property int screenshotHeight: 104
+
+    // ---- region selection (global layout coordinates) ----
+    property bool regionSelecting: false
+    property bool regionDragging: false
+    property real regionStartX: 0
+    property real regionStartY: 0
+    property real regionCurrentX: 0
+    property real regionCurrentY: 0
+    property string regionGeom: ""
+
+    readonly property real regionLeft: Math.min(regionStartX, regionCurrentX)
+    readonly property real regionTop: Math.min(regionStartY, regionCurrentY)
+    readonly property real regionRight: Math.max(regionStartX, regionCurrentX)
+    readonly property real regionBottom: Math.max(regionStartY, regionCurrentY)
+    readonly property real regionWidth: regionRight - regionLeft
+    readonly property real regionHeight: regionBottom - regionTop
+
+    readonly property int collapsedWidth: 104
+    readonly property int collapsedHeight: 28
     readonly property int expandedWidth: 588
 
-    // Fixed heights per panel: the island height animates to a constant
-    // target, never against live content (that caused the previous stutter).
+    // The launcher reports its own height so the island can shrink to fit a
+    // short result list instead of always using the full panel height.
+    property int launcherHeight: 360
+
+    // Fixed heights per panel. The island animates to a constant target so the
+    // tween never fights live content (that was the original stutter), and each
+    // panel's list absorbs the slack via Layout.fillHeight.
     readonly property var panelHeights: ({
-        launcher: 388,
-        clipboard: 368,
-        bookmarks: 368
+        launcher: 360,
+        clipboard: 360,
+        bookmarks: 360,
+        screenshot: 104,
+        power: 104
     })
 
-    readonly property int targetHeight: expanded
-        ? (panelHeights[panel] || 376)
-        : collapsedHeight
+    readonly property int targetHeight: !expanded
+        ? collapsedHeight
+        : (panel === "screenshot"
+            ? screenshotHeight
+            : (panel === "launcher" ? launcherHeight : (panelHeights[panel] || 336)))
 
     function show(name) {
         panel = name;
@@ -32,6 +68,56 @@ Singleton {
     }
 
     function close() {
+        capturing = false;
+        regionSelecting = false;
+        regionDragging = false;
         panel = "clock";
+    }
+
+    function beginRegion() {
+        regionGeom = "";
+        regionDragging = false;
+        regionStartX = 0;
+        regionStartY = 0;
+        regionCurrentX = 0;
+        regionCurrentY = 0;
+        regionSelecting = true;
+    }
+
+    function startRegion(x, y) {
+        regionDragging = true;
+        regionStartX = x;
+        regionStartY = y;
+        regionCurrentX = x;
+        regionCurrentY = y;
+    }
+
+    function updateRegion(x, y) {
+        regionCurrentX = x;
+        regionCurrentY = y;
+    }
+
+    function finishRegion(x, y) {
+        regionCurrentX = x;
+        regionCurrentY = y;
+        regionDragging = false;
+
+        // Compute the geometry BEFORE clearing regionSelecting: that assignment
+        // notifies listeners synchronously, and the screenshot panel reads
+        // regionGeom to decide between capturing and cancelling.
+        const w = Math.round(Math.abs(regionCurrentX - regionStartX));
+        const h = Math.round(Math.abs(regionCurrentY - regionStartY));
+        if (w < 4 || h < 4)
+            regionGeom = "";
+        else
+            regionGeom = Math.round(regionLeft) + "," + Math.round(regionTop) + " " + w + "x" + h;
+
+        regionSelecting = false;
+    }
+
+    function cancelRegion() {
+        regionGeom = "";
+        regionDragging = false;
+        regionSelecting = false;
     }
 }

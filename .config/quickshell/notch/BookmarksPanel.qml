@@ -4,6 +4,9 @@ import Quickshell
 import Quickshell.Io
 import qs
 
+// Bookmarks from bookmarks.tsv: folder <TAB> name <TAB> url <TAB> tag
+// Folder names become quiet section labels; rows are a single line of
+// name + host.
 FocusScope {
     id: root
 
@@ -22,6 +25,11 @@ FocusScope {
             || entry.folder.toLowerCase().includes(q)
             || entry.tag.toLowerCase().includes(q);
     })
+
+    // No URL parser needed: strip scheme, then keep everything before the path.
+    function hostOf(url) {
+        return url.replace(/^[a-z]+:\/\//, "").split("/")[0];
+    }
 
     function refresh() {
         fileProc.running = false;
@@ -55,7 +63,6 @@ FocusScope {
 
     onQueryChanged: selectedIndex = 0
 
-    // bookmarks.tsv: folder <TAB> name <TAB> url <TAB> tag
     Process {
         id: fileProc
 
@@ -75,7 +82,7 @@ FocusScope {
                     const folder = parts[0].trim();
                     out.push({
                         folder: folder,
-                        showFolder: folder !== lastFolder,
+                        isFirstOfFolder: folder !== lastFolder,
                         name: parts[1].trim(),
                         url: parts[2].trim(),
                         tag: (parts[3] || "").trim()
@@ -94,35 +101,30 @@ FocusScope {
         spacing: 0
 
         // ---------- search ----------
-        Rectangle {
+        Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            radius: 10
-            color: Theme.mantle
-            border.width: 1
-            border.color: Theme.surface1
+            Layout.preferredHeight: Theme.searchHeight
 
             Text {
                 anchors.left: parent.left
-                anchors.leftMargin: 13
+                anchors.leftMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
                 text: "\uF002"
                 color: Theme.overlay0
                 font.family: Theme.fontFamily
-                font.pixelSize: 16
+                font.pixelSize: 20
             }
 
             TextInput {
                 id: search
 
                 anchors.left: parent.left
-                anchors.leftMargin: 38
+                anchors.leftMargin: 40
                 anchors.right: parent.right
-                anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 13
+                font.pixelSize: 15
                 clip: true
                 selectByMouse: true
                 onTextChanged: root.query = text
@@ -146,10 +148,10 @@ FocusScope {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Search bookmarks…"
-                    color: Theme.surface2
+                    text: "Search bookmarks"
+                    color: Theme.overlay0
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 15
                     visible: search.text.length === 0
                 }
             }
@@ -159,7 +161,7 @@ FocusScope {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: 8
+            Layout.topMargin: Theme.gap
 
             ListView {
                 id: resultsView
@@ -176,62 +178,48 @@ FocusScope {
                     required property var modelData
                     required property int index
 
-                    // Attached properties like ListView.isCurrentItem are only set on
-                    // the delegate root, so expose it here for the child items.
+                    // ListView.isCurrentItem is only attached to the delegate root,
+                    // so surface it for the child items.
                     readonly property bool isCurrent: ListView.isCurrentItem
 
                     width: resultsView.width
-                    height: (row.modelData.showFolder ? 22 : 0) + 44
+                    height: (row.modelData.isFirstOfFolder ? 30 : 0) + Theme.rowHeight
 
                     Text {
                         id: folderLabel
+
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.leftMargin: 8
-                        height: row.modelData.showFolder ? 22 : 0
-                        visible: row.modelData.showFolder
+                        height: row.modelData.isFirstOfFolder ? 30 : 0
+                        visible: row.modelData.isFirstOfFolder
                         text: row.modelData.folder.toUpperCase()
                         color: Theme.overlay0
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
-                        verticalAlignment: Text.AlignVCenter
+                        font.letterSpacing: 1.1
+                        verticalAlignment: Text.AlignBottom
+                        bottomPadding: 7
                     }
 
                     Rectangle {
                         anchors.top: folderLabel.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        height: 44
-                        radius: 9
-                        color: row.isCurrent ? Theme.surface0 : "transparent"
+                        height: Theme.rowHeight
+                        radius: Theme.rowRadius
+                        color: row.isCurrent ? Theme.itemSelected : "transparent"
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            spacing: 10
-
-                            Rectangle {
-                                Layout.alignment: Qt.AlignVCenter
-                                implicitWidth: 26
-                                implicitHeight: 26
-                                radius: 7
-                                color: Theme.surface1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: row.modelData.name.charAt(0).toUpperCase()
-                                    color: Theme.mauve
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                }
-                            }
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 12
 
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Layout.alignment: Qt.AlignVCenter
-                                spacing: 1
+                                spacing: 2
 
                                 Text {
                                     Layout.fillWidth: true
@@ -241,23 +229,15 @@ FocusScope {
                                     font.pixelSize: 13
                                     elide: Text.ElideRight
                                 }
+
                                 Text {
                                     Layout.fillWidth: true
-                                    text: row.modelData.url
+                                    text: root.hostOf(row.modelData.url)
                                     color: Theme.overlay0
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                     elide: Text.ElideRight
                                 }
-                            }
-
-                            Text {
-                                Layout.alignment: Qt.AlignVCenter
-                                visible: row.modelData.tag.length > 0
-                                text: row.modelData.tag
-                                color: Theme.overlay0
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
                             }
                         }
 
@@ -282,32 +262,9 @@ FocusScope {
                 color: Theme.overlay0
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
+                lineHeight: 1.4
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-            }
-        }
-
-        // ---------- footer ----------
-        Row {
-            Layout.fillWidth: true
-            Layout.topMargin: 9
-            Layout.preferredHeight: 18
-            spacing: 14
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "↵  open in browser"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "ctrl n/p  move"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
             }
         }
     }

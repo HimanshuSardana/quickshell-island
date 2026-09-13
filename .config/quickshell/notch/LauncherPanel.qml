@@ -5,6 +5,8 @@ import Quickshell.Widgets
 import qs
 import "Expression.js" as Expression
 
+// Application launcher, doubling as an inline calculator.
+// Borderless search, two-line rows (name over description), no footer chrome.
 FocusScope {
     id: root
 
@@ -14,7 +16,20 @@ FocusScope {
     readonly property var answer: Expression.evaluate(query)
     readonly property bool hasAnswer: answer !== null
 
+    // Result rows are capped at the number that fits the default panel; below
+    // that the island shrinks so a short result list has no dead space.
+    readonly property int maxRows: 5
+    readonly property int resultCount: resultsView.count
+    readonly property int contentHeight: Theme.padV * 2
+        + Theme.searchHeight
+        + (hasAnswer ? 49 : 0)
+        + Theme.gap
+        + Math.min(resultCount, maxRows) * Theme.rowHeight
+
     function takeInitialFocus() {
+        search.text = "";
+        query = "";
+        selectedIndex = 0;
         search.forceActiveFocus(Qt.TabFocusReason);
     }
 
@@ -32,11 +47,7 @@ FocusScope {
             ShellState.close();
             return;
         }
-        const values = filtered.values;
-        if (values.length > 0) {
-            values[Math.max(0, Math.min(selectedIndex, values.length - 1))].execute();
-            ShellState.close();
-        }
+        activateIndex(selectedIndex);
     }
 
     function activateIndex(i) {
@@ -48,42 +59,55 @@ FocusScope {
     }
 
     onQueryChanged: selectedIndex = 0
-    Component.onCompleted: takeInitialFocus()
+    onContentHeightChanged: ShellState.launcherHeight = contentHeight
+
+    // Clear the search when the launcher closes so it always reopens at full
+    // height rather than briefly matching the last query.
+    onVisibleChanged: {
+        if (!visible) {
+            search.text = "";
+            selectedIndex = 0;
+        }
+    }
+
+    Component.onCompleted: {
+        ShellState.launcherHeight = contentHeight;
+        takeInitialFocus();
+    }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
         // ---------- search ----------
-        Rectangle {
+        Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            radius: 10
-            color: Theme.mantle
-            border.width: 1
-            border.color: Theme.surface1
+            Layout.preferredHeight: Theme.searchHeight
 
             Text {
                 anchors.left: parent.left
-                anchors.leftMargin: 13
+                anchors.leftMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
                 text: "\uF002"
-                color: Theme.overlay0
+                color: root.hasAnswer ? Theme.mauve : Theme.overlay0
                 font.family: Theme.fontFamily
-                font.pixelSize: 16
+                font.pixelSize: 20
+
+                Behavior on color {
+                    ColorAnimation { duration: Theme.animFast }
+                }
             }
 
             TextInput {
                 id: search
 
                 anchors.left: parent.left
-                anchors.leftMargin: 38
+                anchors.leftMargin: 40
                 anchors.right: parent.right
-                anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 13
+                font.pixelSize: 15
                 clip: true
                 selectByMouse: true
                 onTextChanged: root.query = text
@@ -107,60 +131,53 @@ FocusScope {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Search apps or calculate…"
-                    color: Theme.surface2
+                    text: "Search apps or calculate..."
+                    color: Theme.overlay0
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 15
                     visible: search.text.length === 0
                 }
             }
         }
 
-        // ---------- inline calculator ----------
-        Rectangle {
+        // ---------- inline result ----------
+        Item {
             Layout.fillWidth: true
-            Layout.topMargin: root.hasAnswer ? 8 : 0
-            Layout.preferredHeight: root.hasAnswer ? 60 : 0
-            radius: 10
-            color: Theme.surface0
-            opacity: root.hasAnswer ? 1 : 0
-            visible: Layout.preferredHeight > 0
+            Layout.preferredHeight: root.hasAnswer ? 48 : 0
+            visible: root.hasAnswer
             clip: true
 
             Behavior on Layout.preferredHeight {
                 NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutCubic }
             }
 
-            Column {
+            Text {
                 anchors.left: parent.left
-                anchors.leftMargin: 13
+                anchors.leftMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 1
-
-                Text {
-                    text: root.query.replace(/\*/g, "×").replace(/\//g, "÷")
-                    color: Theme.subtext
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                }
-                Text {
-                    text: root.hasAnswer ? String(root.answer) : ""
-                    color: Theme.mauve
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 22
-                    font.bold: true
-                }
+                text: root.query.replace(/\*/g, "×").replace(/\//g, "÷")
+                color: Theme.overlay0
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
             }
 
             Text {
                 anchors.right: parent.right
-                anchors.rightMargin: 13
+                anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                text: "↵ copy"
-                color: Theme.overlay0
+                text: root.hasAnswer ? String(root.answer) : ""
+                color: Theme.mauve
                 font.family: Theme.fontFamily
-                font.pixelSize: 10
+                font.pixelSize: 19
+                font.bold: true
             }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: Theme.hairline
+            visible: root.hasAnswer
         }
 
         // ---------- results ----------
@@ -169,7 +186,7 @@ FocusScope {
 
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: 8
+            Layout.topMargin: Theme.gap
             clip: true
             currentIndex: root.selectedIndex
             highlightMoveDuration: 0
@@ -177,6 +194,7 @@ FocusScope {
 
             model: ScriptModel {
                 id: filtered
+
                 values: DesktopEntries.applications.values
                     .filter(entry => {
                         if (entry.noDisplay)
@@ -199,42 +217,45 @@ FocusScope {
                 required property int index
 
                 width: resultsView.width
-                height: 44
-                radius: 9
-                color: ListView.isCurrentItem ? Theme.surface0 : "transparent"
+                height: Theme.rowHeight
+                radius: Theme.rowRadius
+                color: ListView.isCurrentItem ? Theme.itemSelected : "transparent"
 
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 8
-                    anchors.rightMargin: 8
-                    spacing: 10
+                    anchors.rightMargin: 10
+                    spacing: 14
 
                     IconImage {
-                        source: Quickshell.iconPath(row.modelData.icon, "application-x-executable")
-                        implicitSize: 22
                         Layout.alignment: Qt.AlignVCenter
+                        source: Quickshell.iconPath(row.modelData.icon, "application-x-executable")
+                        implicitSize: Theme.iconSize
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignVCenter
-                        spacing: 1
+                        spacing: 2
 
                         Text {
                             Layout.fillWidth: true
                             text: row.modelData.name
                             color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 13
+                            font.pixelSize: 14
+                            font.bold: true
                             elide: Text.ElideRight
                         }
+
                         Text {
                             Layout.fillWidth: true
-                            text: row.modelData.genericName || row.modelData.comment || "Application"
+                            text: row.modelData.genericName || row.modelData.comment || ""
                             color: Theme.overlay0
                             font.family: Theme.fontFamily
-                            font.pixelSize: 10
+                            font.pixelSize: 11
                             elide: Text.ElideRight
+                            visible: text.length > 0
                         }
                     }
                 }
@@ -246,48 +267,6 @@ FocusScope {
                     onEntered: root.selectedIndex = row.index
                     onClicked: root.activateIndex(row.index)
                 }
-            }
-        }
-
-        // ---------- footer ----------
-        Row {
-            Layout.fillWidth: true
-            Layout.topMargin: 9
-            Layout.preferredHeight: 18
-            spacing: 14
-
-            Row {
-                spacing: 5
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "↵"
-                    color: Theme.subtext
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "open"
-                    color: Theme.overlay0
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                }
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "ctrl n/p  move"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "esc  close"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
             }
         }
     }

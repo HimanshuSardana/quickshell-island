@@ -4,6 +4,9 @@ import Quickshell
 import Quickshell.Io
 import qs
 
+// Clipboard history via cliphist.
+// Text entries show their content; binary entries are rewritten from cliphist's
+// raw "[[ binary data ... ]]" form into something legible.
 FocusScope {
     id: root
 
@@ -16,6 +19,14 @@ FocusScope {
         const q = query.toLowerCase();
         return !q || entry.preview.toLowerCase().includes(q);
     })
+
+    // "[[ binary data 41 KiB png 1920x1080 ]]" -> "PNG · 1920×1080 · 41 KiB"
+    function describeImage(raw) {
+        const m = raw.match(/^\[\[\s*binary data\s+(.+?)\s+(\S+)\s+(\d+x\d+)\s*\]\]$/);
+        if (!m)
+            return "Image";
+        return m[2].toUpperCase() + " · " + m[3].replace("x", "×") + " · " + m[1];
+    }
 
     function refresh() {
         listProc.running = false;
@@ -51,7 +62,6 @@ FocusScope {
 
     onQueryChanged: selectedIndex = 0
 
-    // Snapshot of the clipboard history when the panel opens
     Process {
         id: listProc
 
@@ -60,20 +70,22 @@ FocusScope {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const lines = text.split("\n");
                 const out = [];
-                for (const line of lines) {
+                for (const line of text.split("\n")) {
                     if (!line)
                         continue;
                     const tab = line.indexOf("\t");
                     if (tab < 0)
                         continue;
-                    const id = line.substring(0, tab);
                     const preview = line.substring(tab + 1);
+                    const isImage = preview.indexOf("[[ binary data") === 0;
                     out.push({
-                        id: id,
-                        preview: preview,
-                        isImage: preview.indexOf("[[ binary data") === 0
+                        id: line.substring(0, tab),
+                        isImage: isImage,
+                        preview: isImage
+                            ? root.describeImage(preview)
+                            : preview.replace(/\s+/g, " ").trim(),
+                        kind: isImage ? "image" : "text"
                     });
                 }
                 root.entries = out;
@@ -97,35 +109,30 @@ FocusScope {
         spacing: 0
 
         // ---------- search ----------
-        Rectangle {
+        Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            radius: 10
-            color: Theme.mantle
-            border.width: 1
-            border.color: Theme.surface1
+            Layout.preferredHeight: Theme.searchHeight
 
             Text {
                 anchors.left: parent.left
-                anchors.leftMargin: 13
+                anchors.leftMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
                 text: "\uF002"
                 color: Theme.overlay0
                 font.family: Theme.fontFamily
-                font.pixelSize: 16
+                font.pixelSize: 20
             }
 
             TextInput {
                 id: search
 
                 anchors.left: parent.left
-                anchors.leftMargin: 38
+                anchors.leftMargin: 40
                 anchors.right: parent.right
-                anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 13
+                font.pixelSize: 15
                 clip: true
                 selectByMouse: true
                 onTextChanged: root.query = text
@@ -152,10 +159,10 @@ FocusScope {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Search clipboard history…"
-                    color: Theme.surface2
+                    text: "Search clipboard history"
+                    color: Theme.overlay0
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 15
                     visible: search.text.length === 0
                 }
             }
@@ -165,7 +172,7 @@ FocusScope {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: 8
+            Layout.topMargin: Theme.gap
 
             ListView {
                 id: resultsView
@@ -183,43 +190,39 @@ FocusScope {
                     required property int index
 
                     width: resultsView.width
-                    height: 44
-                    radius: 9
-                    color: ListView.isCurrentItem ? Theme.surface0 : "transparent"
+                    height: Theme.rowHeight
+                    radius: Theme.rowRadius
+                    color: ListView.isCurrentItem ? Theme.itemSelected : "transparent"
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        spacing: 10
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 12
 
-                        // image thumbnail placeholder / text badge
-                        Rectangle {
-                            Layout.alignment: Qt.AlignVCenter
-                            implicitWidth: row.modelData.isImage ? 34 : 42
-                            implicitHeight: 26
-                            radius: 6
-                            color: row.modelData.isImage ? Theme.surface1 : Theme.surface0
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: row.modelData.isImage ? "IMG" : "TXT"
-                                color: row.modelData.isImage ? Theme.mauve : Theme.blue
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                            }
-                        }
-
-                        Text {
+                        ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
-                            text: row.modelData.preview
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
+                            spacing: 2
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: row.modelData.preview
+                                color: row.modelData.isImage ? Theme.subtext : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: row.modelData.isImage ? "Image" : "Text"
+                                color: Theme.overlay0
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
                         }
                     }
 
@@ -233,7 +236,6 @@ FocusScope {
                 }
             }
 
-            // ---------- empty state ----------
             Text {
                 anchors.centerIn: parent
                 width: parent.width - 40
@@ -244,40 +246,9 @@ FocusScope {
                 color: Theme.overlay0
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
+                lineHeight: 1.4
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-            }
-        }
-
-        // ---------- footer ----------
-        Row {
-            Layout.fillWidth: true
-            Layout.topMargin: 9
-            Layout.preferredHeight: 18
-            spacing: 14
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "↵  copy back"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "ctrl n/p  move"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "ctrl r  refresh"
-                color: Theme.overlay0
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
             }
         }
     }
