@@ -15,6 +15,29 @@ Singleton {
     // Session lock (ext-session-lock-v1, driven by LockScreen.qml)
     property bool locked: false
 
+    // ---- OSD (volume / brightness) ----
+    property bool osdVisible: false
+    property string osdKind: "volume" // "volume" | "brightness"
+    property real osdValue: 0
+    property bool osdMuted: false
+
+    function showOsd(kind, value, muted) {
+        osdKind = kind;
+        osdValue = Math.max(0, Math.min(1, value));
+        osdMuted = !!muted;
+        osdVisible = true;
+        osdTimer.restart();
+    }
+
+    // Auto-hide the OSD shortly after the last change.
+    Timer {
+        id: osdTimer
+
+        interval: 1600
+        repeat: false
+        onTriggered: ShellState.osdVisible = false
+    }
+
     // The screenshot panel resizes itself between its two stages.
     property int screenshotHeight: 104
 
@@ -49,6 +72,7 @@ Singleton {
         launcher: 360,
         clipboard: 360,
         bookmarks: 360,
+        youtube: 360,
         screenshot: 104,
         power: 104
     })

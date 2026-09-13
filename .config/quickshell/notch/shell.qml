@@ -11,7 +11,8 @@ import qs
 //   collapsed : black pill flush to the top edge showing the time
 //   expanded  : rounded card that grows into the requested panel
 //
-// Panels: launcher (SUPER+A), clipboard (SUPER+C), bookmarks (ALT+B).
+// Panels: launcher (SUPER+A), clipboard (SUPER+C), bookmarks (ALT+B),
+// youtube (ALT+Y).
 // Driven from the compositor:
 //   qs -c notch ipc call notch toggle launcher
 //   qs -c notch ipc call notch toggle clipboard
@@ -37,6 +38,59 @@ ShellRoot {
 
         function lock() {
             ShellState.locked = true;
+        }
+
+        function volume(action: string) {
+            let cmd = "";
+            if (action === "up")
+                cmd = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+";
+            else if (action === "down")
+                cmd = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-";
+            else if (action === "mute")
+                cmd = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
+            if (cmd.length === 0)
+                return;
+            volumeProc.running = false;
+            volumeProc.command = ["sh", "-c", cmd + " >/dev/null 2>&1; wpctl get-volume @DEFAULT_AUDIO_SINK@"];
+            volumeProc.running = true;
+        }
+
+        function brightness(action: string) {
+            const step = action === "down" ? "5%-" : "5%+";
+            brightnessProc.running = false;
+            brightnessProc.command = ["sh", "-c", "brightnessctl set " + step + " >/dev/null 2>&1; brightnessctl -m"];
+            brightnessProc.running = true;
+        }
+    }
+
+    // ---- volume / brightness changes, reported to the OSD ----
+    Process {
+        id: volumeProc
+
+        command: []
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const m = text.match(/Volume:\s*([0-9.]+)(\s*\[MUTED\])?/);
+                if (m)
+                    ShellState.showOsd("volume", parseFloat(m[1]), !!m[2]);
+            }
+        }
+    }
+
+    Process {
+        id: brightnessProc
+
+        command: []
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const m = text.match(/([0-9]+)%/);
+                if (m)
+                    ShellState.showOsd("brightness", parseInt(m[1], 10) / 100, false);
+            }
         }
     }
 
@@ -126,6 +180,7 @@ ShellRoot {
                 case "launcher":   return launcherPanel;
                 case "clipboard":  return clipboardPanel;
                 case "bookmarks":  return bookmarksPanel;
+                case "youtube":    return youtubePanel;
                 case "screenshot": return screenshotPanel;
                 case "power":      return powerPanel;
                 }
@@ -139,12 +194,15 @@ ShellRoot {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
 
-                width: ShellState.expanded ? ShellState.expandedWidth : ShellState.collapsedWidth
+                width: ShellState.expanded
+                    ? ShellState.expandedWidth
+                    : (ShellState.osdVisible ? osdWidth : ShellState.collapsedWidth)
                 height: ShellState.targetHeight
 
                 // Notch geometry: `flare` is the concave shoulder that spreads
                 // out to the screen edge at the top, `foot` is the convex radius
                 // on the bottom corners. The body itself stays `width` wide.
+                readonly property int osdWidth: 232
                 property real flare: ShellState.expanded ? 16 : 10
                 property real foot: ShellState.expanded ? 16 : 12
                 property color fill: ShellState.expanded ? Theme.crust : "#000000"
@@ -245,7 +303,7 @@ ShellRoot {
                 Row {
                     anchors.centerIn: parent
                     spacing: 7
-                    opacity: ShellState.expanded ? 0 : 1
+                    opacity: (ShellState.expanded || ShellState.osdVisible) ? 0 : 1
                     visible: opacity > 0
 
                     Behavior on opacity {
@@ -277,6 +335,69 @@ ShellRoot {
                             running: true
                             repeat: true
                             onTriggered: clock.now = new Date()
+                        }
+                    }
+                }
+
+                // ---------------- OSD (volume / brightness) ----------------
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+                    opacity: (ShellState.osdVisible && !ShellState.expanded) ? 1 : 0
+                    visible: opacity > 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.animFast }
+                    }
+
+                    Text {
+                        id: osdIcon
+
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: ShellState.osdKind === "volume"
+                            ? (ShellState.osdMuted ? "\uF026" : "\uF028")
+                            : "\uF185"
+                        color: ShellState.osdKind === "volume"
+                            ? (ShellState.osdMuted ? Theme.red : Theme.blue)
+                            : Theme.yellow
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 14
+                    }
+
+                    Text {
+                        id: osdPercent
+
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Math.round(ShellState.osdValue * 100) + "%"
+                        color: Theme.subtext
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                    }
+
+                    Rectangle {
+                        anchors.left: osdIcon.right
+                        anchors.right: osdPercent.left
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 6
+                        radius: 3
+                        color: Theme.surface0
+
+                        Rectangle {
+                            width: parent.width * ShellState.osdValue
+                            height: parent.height
+                            radius: 3
+                            color: ShellState.osdKind === "volume"
+                                ? (ShellState.osdMuted ? Theme.red : Theme.blue)
+                                : Theme.yellow
+
+                            Behavior on width {
+                                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                            }
                         }
                     }
                 }
@@ -325,6 +446,14 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "bookmarks"
+                    }
+
+                    YoutubePanel {
+                        id: youtubePanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "youtube"
                     }
 
                     ScreenshotPanel {
