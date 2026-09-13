@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Widgets
 import qs
 
 // Clipboard history via cliphist.
@@ -14,6 +15,9 @@ FocusScope {
     property int selectedIndex: 0
     property var entries: []
     property bool loaded: false
+
+    // where decoded image previews are cached (tmpfs, per user)
+    readonly property string thumbDir: String(Quickshell.env("XDG_RUNTIME_DIR"))
 
     readonly property var filtered: entries.filter(entry => {
         const q = query.toLowerCase();
@@ -189,6 +193,30 @@ FocusScope {
                     required property var modelData
                     required property int index
 
+                    readonly property bool isImage: modelData.isImage === true
+                    readonly property string thumbPath: root.thumbDir + "/notch-clip-" + modelData.id + ".png"
+                    property bool ready: false
+
+                    // Decode the stored image to a file once, for the preview.
+                    function loadThumb() {
+                        if (!isImage) {
+                            thumb.source = "";
+                            return;
+                        }
+                        if (thumb.source === "file://" + thumbPath)
+                            return;
+                        thumb.source = "";
+                        decodeProc.running = false;
+                        decodeProc.command = ["sh", "-c", "cliphist decode " + modelData.id + " > " + thumbPath + " 2>/dev/null"];
+                        decodeProc.running = true;
+                    }
+
+                    Component.onCompleted: {
+                        ready = true;
+                        loadThumb();
+                    }
+                    onModelDataChanged: if (ready) loadThumb()
+
                     width: resultsView.width
                     height: Theme.rowHeight
                     radius: Theme.rowRadius
@@ -223,6 +251,33 @@ FocusScope {
                                 font.pixelSize: 11
                                 elide: Text.ElideRight
                             }
+                        }
+
+                        ClippingRectangle {
+                            Layout.alignment: Qt.AlignVCenter
+                            Layout.preferredWidth: 76
+                            Layout.preferredHeight: 43
+                            visible: row.isImage
+                            radius: 6
+                            color: Theme.surface0
+
+                            Image {
+                                id: thumb
+                                anchors.fill: parent
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                cache: true
+                                sourceSize: Qt.size(160, 90)
+                            }
+                        }
+                    }
+
+                    Process {
+                        id: decodeProc
+                        running: false
+                        onExited: (code, status) => {
+                            if (code === 0 && row.isImage)
+                                thumb.source = "file://" + row.thumbPath;
                         }
                     }
 
