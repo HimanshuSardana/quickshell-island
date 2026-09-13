@@ -59,6 +59,7 @@ Singleton {
 
     readonly property int collapsedWidth: 104
     readonly property int collapsedHeight: 28
+    readonly property int osdHeight: 42
     readonly property int expandedWidth: 588
 
     // The launcher reports its own height so the island can shrink to fit a
@@ -78,7 +79,7 @@ Singleton {
     })
 
     readonly property int targetHeight: !expanded
-        ? collapsedHeight
+        ? (osdVisible ? osdHeight : collapsedHeight)
         : (panel === "screenshot"
             ? screenshotHeight
             : (panel === "launcher" ? launcherHeight : (panelHeights[panel] || 336)))

@@ -363,7 +363,7 @@ ShellRoot {
                             ? (ShellState.osdMuted ? Theme.red : Theme.blue)
                             : Theme.yellow
                         font.family: Theme.fontFamily
-                        font.pixelSize: 14
+                        font.pixelSize: 20
                     }
 
                     Text {
@@ -383,8 +383,8 @@ ShellRoot {
                         anchors.leftMargin: 10
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        height: 6
-                        radius: 3
+                        height: 8
+                        radius: 4
                         color: Theme.surface0
 
                         Rectangle {
