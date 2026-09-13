@@ -1,0 +1,7 @@
+{
+  "lastChangelogVersion": "0.85.1",
+  "theme": "catppuccin-mocha",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "kimi-k2.6",
+  "externalEditor": "nvim"
+}

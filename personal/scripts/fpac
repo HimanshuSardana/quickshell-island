@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# fpac - fuzzy-find AUR (+ repo) packages and install without confirmation
+set -euo pipefail
+
+if ! command -v yay >/dev/null; then
+  echo "fpac: yay not found" >&2
+  exit 1
+fi
+if ! command -v fzf >/dev/null; then
+  echo "fpac: fzf not found" >&2
+  exit 1
+fi
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/fpac"
+CACHE_FILE="$CACHE_DIR/pkglist"
+
+mkdir -p "$CACHE_DIR"
+
+refresh_cache() {
+  yay -Slqa 2>/dev/null | sort -u > "$CACHE_FILE.tmp" && mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+}
+
+# Build cache on first run (in background after? no - blocking first time)
+if [ ! -s "$CACHE_FILE" ]; then
+  echo "fpac: building package cache (first run, may take a moment)..." >&2
+  refresh_cache
+fi
+
+# CTRL-R reload handler needs a non-interactive refresher; pass via env
+export FPAC_CACHE_FILE="$CACHE_FILE"
+
+selected=$(cat "$CACHE_FILE" | fzf --multi \
+  --prompt='install> ' \
+  --preview 'yay -Si {1} 2>/dev/null' \
+  --preview-window 'right:60%:wrap' \
+  --header 'TAB multi-select, ENTER install, CTRL-R refresh, CTRL-L copy name' \
+  --bind "ctrl-r:reload-sync(yay -Slqa 2>/dev/null | sort -u | tee \"$CACHE_FILE\")+clear-query" \
+  --bind 'ctrl-l:execute-silent(echo -n {1} | wl-copy 2>/dev/null || echo -n {1} | xclip -selection clipboard 2>/dev/null)') || exit 0
+
+[ -z "$selected" ] && exit 0
+
+# shellcheck disable=SC2086
+echo "$selected" | xargs -ro yay -S --noconfirm

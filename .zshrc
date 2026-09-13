@@ -1,0 +1,72 @@
+# Minimal Zsh + Catppuccin Mocha prompt
+
+# History
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE
+
+# Completion
+autoload -Uz compinit && compinit
+zstyle ':completion:*' menu select
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+# Aliases / env
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias c=clear
+alias ssh='kitty +kitten ssh'
+export EDITOR=nvim
+export VISUAL=nvim
+export PATH="$HOME/.local/bin:$HOME/.local/share/pi-node/node-v22.23.2-linux-x64/bin:$PATH"
+
+# fzf (Ctrl+R history, Ctrl+T files, Alt+C cd)
+[ -f /usr/share/fzf/key-bindings.zsh ] && source /usr/share/fzf/key-bindings.zsh
+[ -f /usr/share/fzf/completion.zsh ] && source /usr/share/fzf/completion.zsh
+
+# zoxide + init
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+
+# Ctrl+F: fuzzy recent dirs via zoxide, input at top, Enter to cd
+_zoxide_fzf_cd() {
+  local dir
+  dir=$(zoxide query -l 2>/dev/null | fzf --layout=reverse --height=40% --prompt='jump> ' --header 'CTRL-F jump | ENTER cd') || return 1
+  [ -n "$dir" ] && { cd "$dir" || return 1; zle reset-prompt; }
+}
+zle -N _zoxide_fzf_cd
+bindkey '^F' _zoxide_fzf_cd
+
+# Ctrl+O: fuzzy files in cwd, Enter xdg-opens the selection
+_fzf_xdg_open() {
+  local file
+  file=$(find . -type f -not -path '*/.*' 2>/dev/null | sed 's|^\./||' | fzf --layout=reverse --height=40% --prompt='open> ' --header 'CTRL-O open | ENTER xdg-open') || return 1
+  [ -n "$file" ] && {
+    if xdg-open "$file" >/dev/null 2>&1; then
+      zle reset-prompt
+    else
+      # No xdg handler (or it failed) -> edit in nvim
+      BUFFER="nvim ${(q)file}"
+      zle accept-line
+    fi
+  }
+}
+zle -N _fzf_xdg_open
+bindkey '^O' _fzf_xdg_open
+
+# Ctrl+X,E: edit current command in $EDITOR
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^Xe' edit-command-line
+bindkey '^X^E' edit-command-line
+
+# --- Git branch (minimal, no plugins) ---
+autoload -Uz vcs_info
+precmd() { vcs_info }
+zstyle ':vcs_info:git:*' formats ' %F{#cba6f7}(%b)%f'
+zstyle ':vcs_info:git:*' actionformats ' %F{#cba6f7}(%b|%a)%f'
+setopt PROMPT_SUBST
+
+# --- Clean minimal Catppuccin Mocha prompt (single line) ---
+# user@host (mauve) pwd (blue) >
+PROMPT='%F{#cba6f7}%n@%m%f %F{#89b4fa}%~%f${vcs_info_msg_0_} %(?.%F{#a6e3a1}.%F{#f38ba8})❯%f '
+RPROMPT=''

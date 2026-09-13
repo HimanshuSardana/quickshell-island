@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# dotgit - manage the dotfiles repo.
+#
+# The repo is bare (git dir ~/.dotfiles) with $HOME as its work tree, so the
+# real config files are tracked in place: no copies, no symlinks.
+#
+#   dotgit status
+#   dotgit diff
+#   dotgit log --oneline
+#   dotgit add .zshrc .config/quickshell/notch
+#   dotgit commit -m "..."
+set -euo pipefail
+
+exec git --git-dir="$HOME/.dotfiles" --work-tree="$HOME" "$@"

@@ -1,0 +1,12 @@
+Dev	Quickshell docs	https://quickshell.org/docs/	qml
+Dev	Quickshell GitHub	https://github.com/quickshell-mirror/quickshell	qml
+Dev	Arch Wiki	https://wiki.archlinux.org/	arch
+Dev	Neovim docs	https://neovim.io/doc/user/	nvim
+Dev	vim.pack guide	https://neovim.io/doc/user/pack/	nvim
+Dev	Catppuccin palette	https://github.com/catppuccin/catppuccin	theme
+Reading	Hacker News	https://news.ycombinator.com/	news
+Reading	Lobsters	https://lobste.rs/	news
+Tools	fzf-lua options	https://github.com/ibhagwan/fzf-lua/blob/main/OPTIONS.md	fzf
+Tools	yay (AUR helper)	https://github.com/Jguer/yay	aur
+Tools	blink.cmp	https://cmp.saghen.dev/	nvim
+Tools	zoxide	https://github.com/ajeetdsouza/zoxide	shell
