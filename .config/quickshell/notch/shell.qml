@@ -139,7 +139,10 @@ ShellRoot {
             // whose keyboard interactivity is EXCLUSIVE; on-demand surfaces
             // stay unfocused until clicked. `focusable` maps to on-demand, so
             // set the layer-shell property directly.
-            WlrLayershell.layer: WlrLayer.Overlay
+            // Top layer, not Overlay: fullscreen clients live above Top (but
+            // below Overlay) in Mango's scene, so a fullscreen window covers
+            // the notch, while the notch still floats above tiled/floating ones.
+            WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.namespace: "notch"
             WlrLayershell.keyboardFocus: (ShellState.expanded && !ShellState.capturing) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
