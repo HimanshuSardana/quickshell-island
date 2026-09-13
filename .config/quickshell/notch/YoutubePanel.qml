@@ -88,7 +88,11 @@ FocusScope {
         if (i < 0 || i >= entries.length)
             return;
         const id = entries[i].id;
-        Quickshell.execDetached(["mpv", "--ytdl-format=best", "https://www.youtube.com/watch?v=" + id]);
+        // Force the Wayland context: the shell inherits DISPLAY from the
+        // session, and mpv would otherwise pick X11 and never map a window.
+        // No --ytdl-format: mpv's default selector works, whereas "best"
+        // is unavailable for many YouTube videos (mpv then exits with an error).
+        Quickshell.execDetached(["mpv", "--gpu-context=wayland", "https://www.youtube.com/watch?v=" + id]);
         ShellState.close();
     }
 
