@@ -3,7 +3,8 @@ import QtQuick
 import Quickshell
 
 Singleton {
-    // "clock" | "launcher" | "clipboard" | "bookmarks" | "screenshot" | "power"
+    // "clock" | "launcher" | "clipboard" | "bookmarks" | "youtube" | "themes"
+    // | "utilities" | "wifi" | "bluetooth" | "wallpapers" | "screenshot" | "power"
     property string panel: "clock"
     readonly property bool expanded: panel !== "clock"
 
@@ -14,6 +15,10 @@ Singleton {
 
     // Session lock (ext-session-lock-v1, driven by LockScreen.qml)
     property bool locked: false
+
+    // Manual hide for the collapsed pill (alt+space). Suppresses only the
+    // collapsed state; expanded panels and the OSD still appear.
+    property bool notchHidden: false
 
     // ---- OSD (volume / brightness) ----
     property bool osdVisible: false
@@ -57,8 +62,10 @@ Singleton {
     readonly property real regionWidth: regionRight - regionLeft
     readonly property real regionHeight: regionBottom - regionTop
 
-    readonly property int collapsedWidth: 104
-    readonly property int collapsedHeight: 28
+    // Wide/tall enough for battery + clock + cpu on the collapsed pill. The
+    // height has to clear the 36px icons that flank the 12px clock.
+    readonly property int collapsedWidth: 206
+    readonly property int collapsedHeight: 48
     readonly property int osdHeight: 42
     readonly property int expandedWidth: 588
 
@@ -76,6 +83,10 @@ Singleton {
         bookmarks: 360,
         youtube: 360,
         themes: 360,
+        utilities: 136,
+        wifi: 360,
+        bluetooth: 360,
+        wallpapers: 360,
         screenshot: 104,
         power: 104
     })

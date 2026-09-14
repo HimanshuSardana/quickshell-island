@@ -4,6 +4,7 @@ import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Services.UPower
 import qs
 
 // Notch / dynamic island.
@@ -38,6 +39,11 @@ ShellRoot {
 
         function lock() {
             ShellState.locked = true;
+        }
+
+        // Toggle the collapsed pill on/off (SUPER+period style manual hide).
+        function toggleNotch() {
+            ShellState.notchHidden = !ShellState.notchHidden;
         }
 
         function theme(id: string) {
@@ -125,6 +131,16 @@ ShellRoot {
             readonly property int canvasWidth: 700
             readonly property int canvasHeight: 520
 
+            // green while charging/full, red when low, otherwise muted
+            readonly property color batteryColor: {
+                const d = UPower.displayDevice;
+                if (d.state === UPowerDeviceState.Charging || d.state === UPowerDeviceState.FullyCharged)
+                    return Theme.green;
+                if (d.percentage <= 0.15)
+                    return Theme.red;
+                return Theme.subtext;
+            }
+
             anchors {
                 top: true
                 left: true
@@ -138,20 +154,39 @@ ShellRoot {
             exclusiveZone: 0
             exclusionMode: ExclusionMode.Ignore
 
-            // Keyboard focus.
-            // Mango only grants automatic keyboard focus to layer surfaces
-            // whose keyboard interactivity is EXCLUSIVE; on-demand surfaces
-            // stay unfocused until clicked. `focusable` maps to on-demand, so
-            // set the layer-shell property directly.
-            // Top layer, not Overlay: fullscreen clients live above Top (but
-            // below Overlay) in Mango's scene, so a fullscreen window covers
-            // the notch, while the notch still floats above tiled/floating ones.
-            WlrLayershell.layer: WlrLayer.Top
+            // Mango's scene order (from its Lyr* enum) is:
+            //   LyrTile < LyrFloat < LyrTop < LyrFullscreen < ... < LyrOverlay
+            // so a fullscreen client covers LyrTop. The island therefore lives on
+            // Overlay permanently, which makes expanded panels reachable even
+            // when a fullscreen window is focused, and the collapsed pill is
+            // suppressed explicitly instead of relying on being covered.
+            //
+            // (Switching the layer at runtime does not work: Mango only places a
+            // layer surface into its scene when the surface is mapped,
+            // wl_list_insert(&l->mon->layers[...]), and never re-parents it on a
+            // later commit.)
+            //
+            // Note this is a layer-shell property, not a visibility flag.
+            WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "notch"
             WlrLayershell.keyboardFocus: (ShellState.expanded && !ShellState.capturing) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-            // Hide during capture (so it cannot land in a screenshot) and while
-            // the session is locked (the lock surface should own the screen).
+            // Focused fullscreen client, straight from wlr-foreign-toplevel
+            // (Mango implements it), so this is event-driven rather than polled.
+            readonly property bool fullscreenFocused: {
+                const t = ToplevelManager.activeToplevel;
+                return t !== null && t !== undefined && t.fullscreen === true;
+            }
+
+            // Only the collapsed pill is ever suppressed, by the manual toggle
+            // (alt+space) or by a focused fullscreen window. Expanded panels and
+            // the transient OSD always show.
+            readonly property bool pillSuppressed: !ShellState.expanded && !ShellState.osdVisible
+                && (ShellState.notchHidden || fullscreenFocused)
+
+            // Unmap entirely only for capture (so it cannot land in a screenshot)
+            // and while the session is locked. The hide toggle slides the island
+            // out instead, so it needs the surface to stay mapped.
             visible: !ShellState.capturing && !ShellState.locked
 
             // Clicks pass through everywhere except the island
@@ -217,6 +252,10 @@ ShellRoot {
                 case "themes":     return themesPanel;
                 case "screenshot": return screenshotPanel;
                 case "power":      return powerPanel;
+                case "utilities":  return utilitiesPanel;
+                case "wifi":       return wifiPanel;
+                case "bluetooth":  return bluetoothPanel;
+                case "wallpapers": return wallpaperPanel;
                 }
                 return null;
             }
@@ -227,6 +266,12 @@ ShellRoot {
 
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
+
+                // Slide up out of view when suppressed -- the manual hide toggle
+                // (alt+space) or a focused fullscreen client. The surface stays
+                // mapped (unlike capture/lock) so this can animate, and sliding
+                // fully clear means the input region goes with it.
+                anchors.topMargin: win.pillSuppressed ? -(height + 8) : 0
 
                 width: ShellState.expanded
                     ? ShellState.expandedWidth
@@ -251,6 +296,9 @@ ShellRoot {
                 }
 
                 Behavior on width {
+                    NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
+                }
+                Behavior on anchors.topMargin {
                     NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
                 }
                 Behavior on height {
@@ -333,10 +381,10 @@ ShellRoot {
                     }
                 }
 
-                // ---------------- collapsed clock ----------------
+                // ---------------- collapsed: battery · clock · cpu ----------------
                 Row {
                     anchors.centerIn: parent
-                    spacing: 7
+                    spacing: 9
                     opacity: (ShellState.expanded || ShellState.osdVisible) ? 0 : 1
                     visible: opacity > 0
 
@@ -344,31 +392,89 @@ ShellRoot {
                         NumberAnimation { duration: Theme.animFast }
                     }
 
-                    Rectangle {
+                    // battery, left of the time
+                    Row {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 5
-                        height: 5
-                        radius: 3
-                        color: Theme.green
+                        spacing: 8
+                        visible: UPower.displayDevice.isLaptopBattery
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "\uF240"
+                            color: batteryColor
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 36
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Math.round(UPower.displayDevice.percentage * 100) + "%"
+                            color: batteryColor
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                        }
                     }
 
-                    Text {
-                        id: clock
-
+                    // clock icon + time
+                    Row {
                         anchors.verticalCenter: parent.verticalCenter
-                        property var now: new Date()
+                        spacing: 8
 
-                        text: Qt.formatDateTime(clock.now, "hh:mm")
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.letterSpacing: 0.3
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "\uF017"
+                            color: Theme.overlay0
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 36
+                        }
 
-                        Timer {
-                            interval: 1000
-                            running: true
-                            repeat: true
-                            onTriggered: clock.now = new Date()
+                        Text {
+                            id: clock
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            property var now: new Date()
+
+                            text: Qt.formatDateTime(clock.now, "hh:mm")
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.letterSpacing: 0.3
+
+                            Timer {
+                                interval: 1000
+                                running: true
+                                repeat: true
+                                onTriggered: {
+                                    // The pill only shows hh:mm, so only reassign when the
+                                    // displayed minute actually changes. Touching `now`
+                                    // every second repainted the island 60x more often
+                                    // than needed.
+                                    if (Qt.formatDateTime(new Date(), "hh:mm") !== clock.text)
+                                        clock.now = new Date();
+                                }
+                            }
+                        }
+                    }
+
+                    // cpu, right of the time
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 8
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "\uF2DB"
+                            color: Theme.overlay0
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 36
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Math.round(SysStats.usage * 100) + "%"
+                            color: Theme.overlay0
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
                         }
                     }
                 }
@@ -512,6 +618,38 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "power"
+                    }
+
+                    UtilitiesPanel {
+                        id: utilitiesPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "utilities"
+                    }
+
+                    WifiPanel {
+                        id: wifiPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "wifi"
+                    }
+
+                    BluetoothPanel {
+                        id: bluetoothPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "bluetooth"
+                    }
+
+                    WallpaperPanel {
+                        id: wallpaperPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "wallpapers"
                     }
                 }
             }

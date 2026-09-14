@@ -7,7 +7,7 @@ import qs
 // Screenshot menu.
 //
 //   stage 1  choose a mode        -> full screen | region
-//   stage 2  pick a destination   -> copy to clipboard | save to ~/personal/pix
+//   stage 2  pick a destination   -> copy to clipboard | save to ~/personal/pix/screenshots
 //
 // Region selection is handled in-process by RegionSelector.qml (driven through
 // ShellState) rather than by slurp, which never managed to present its overlay
@@ -34,14 +34,14 @@ FocusScope {
         ? "grim is required:\n\nsudo pacman -S grim"
         : errorText
 
-    readonly property string saveDir: String(Quickshell.env("HOME")) + "/personal/pix"
+    readonly property string saveDir: String(Quickshell.env("HOME")) + "/personal/pix/screenshots"
 
     function applyStage() {
         if (stage === "destination") {
             ShellState.screenshotHeight = 314;
             rows = [
                 { label: "Copy to clipboard", hint: "", action: "copy" },
-                { label: "Save to ~/personal/pix", hint: shotName, action: "save" }
+                { label: "Save to ~/personal/pix/screenshots", hint: shotName, action: "save" }
             ];
         } else if (showMessage) {
             ShellState.screenshotHeight = 168;
