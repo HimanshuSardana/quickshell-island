@@ -4,184 +4,252 @@ import Quickshell
 import qs
 import "Themes.js" as Themes
 
-// Theme picker. Each card previews a theme's palette; Enter/click applies it
-// to the shell and rewrites the kitty/nvim configs.
+// Theme picker, laid out like the launcher: borderless search, hairline rule,
+// one row per theme with the palette on the left and the name beside it.
 FocusScope {
     id: root
 
+    property string query: ""
     property int selectedIndex: 0
+
     readonly property var ids: Themes.ids()
-    readonly property int columns: 3
+
+    readonly property var filtered: ids.filter(id => {
+        const q = query.toLowerCase();
+        if (!q)
+            return true;
+        return id.toLowerCase().includes(q) || Themes.name(id).toLowerCase().includes(q);
+    })
+
+    // Result rows are capped at the number that fits the default panel; below
+    // that the island shrinks so a filtered list has no dead space. Derived from
+    // the result count only -- never from the laid-out height, which would feed
+    // back into the island height and oscillate.
+    readonly property int maxRows: 5
+    readonly property int contentHeight: Theme.padV * 2
+        + Theme.searchHeight
+        + 1
+        + Theme.gap
+        + Math.min(filtered.length, maxRows) * Theme.rowHeight
 
     function takeInitialFocus() {
+        search.text = "";
+        query = "";
         selectedIndex = Math.max(0, ids.indexOf(ThemeManager.currentId));
-        grid.positionViewAtIndex(selectedIndex, GridView.Contain);
-        root.forceActiveFocus(Qt.TabFocusReason);
+        resultsView.positionViewAtIndex(selectedIndex, ListView.Contain);
+        search.forceActiveFocus(Qt.TabFocusReason);
     }
 
-    function moveSelection(dx, dy) {
-        const n = ids.length;
+    function moveSelection(delta) {
+        const n = filtered.length;
         if (n === 0)
             return;
-        const cols = columns;
-        let i = selectedIndex;
-        if (dx !== 0) {
-            const col = i % cols;
-            const nextCol = col + dx;
-            if (nextCol >= 0 && nextCol < cols)
-                i = i + dx;
-        }
-        if (dy !== 0) {
-            const next = i + dy * cols;
-            if (next >= 0 && next < n)
-                i = next;
-        }
-        if (i !== selectedIndex) {
-            selectedIndex = i;
-            grid.positionViewAtIndex(selectedIndex, GridView.Contain);
-        }
+        selectedIndex = Math.max(0, Math.min(n - 1, selectedIndex + delta));
+        resultsView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
 
     function activateSelection() {
-        if (selectedIndex < 0 || selectedIndex >= ids.length)
+        activateIndex(selectedIndex);
+    }
+
+    function activateIndex(i) {
+        if (i < 0 || i >= filtered.length)
             return;
-        ThemeManager.activate(ids[selectedIndex]);
+        ThemeManager.activate(filtered[i]);
         ShellState.close();
     }
 
+    onQueryChanged: selectedIndex = 0
+    onContentHeightChanged: ShellState.themesHeight = contentHeight
+
     onVisibleChanged: {
-        if (visible)
-            takeInitialFocus();
-    }
-
-    Keys.onLeftPressed: moveSelection(-1, 0)
-    Keys.onRightPressed: moveSelection(1, 0)
-    Keys.onUpPressed: moveSelection(0, -1)
-    Keys.onDownPressed: moveSelection(0, 1)
-    Keys.onReturnPressed: activateSelection()
-    Keys.onEnterPressed: activateSelection()
-    Keys.onEscapePressed: ShellState.close()
-
-    Keys.onPressed: event => {
-        if (event.modifiers & Qt.ControlModifier) {
-            if (event.key === Qt.Key_N) {
-                moveSelection(0, 1);
-                event.accepted = true;
-            } else if (event.key === Qt.Key_P) {
-                moveSelection(0, -1);
-                event.accepted = true;
-            }
+        if (!visible) {
+            search.text = "";
+            selectedIndex = 0;
         }
     }
 
-    GridView {
-        id: grid
+    Component.onCompleted: ShellState.themesHeight = contentHeight
 
+    ColumnLayout {
         anchors.fill: parent
-        cellWidth: Math.floor(width / root.columns)
-        cellHeight: Math.floor(height / 2)
-        model: root.ids
-        interactive: true
-        boundsBehavior: Flickable.StopAtBounds
-        currentIndex: root.selectedIndex
+        spacing: 0
 
-        delegate: Item {
-            id: cell
+        // ---------- search ----------
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.searchHeight
 
-            required property var modelData
-            required property int index
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                text: "\uF002"
+                color: Theme.overlay0
+                font.family: Theme.fontFamily
+                font.pixelSize: 20
+            }
 
-            readonly property var theme: Themes.get(modelData)
-            readonly property var tp: theme.palette
-            readonly property bool isCurrent: modelData === ThemeManager.currentId
+            TextInput {
+                id: search
 
-            width: grid.cellWidth
-            height: grid.cellHeight
+                anchors.left: parent.left
+                anchors.leftMargin: 40
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: 15
+                clip: true
+                selectByMouse: true
+                onTextChanged: root.query = text
+                Keys.onDownPressed: root.moveSelection(1)
+                Keys.onUpPressed: root.moveSelection(-1)
+                Keys.onReturnPressed: root.activateSelection()
+                Keys.onEnterPressed: root.activateSelection()
+                Keys.onEscapePressed: ShellState.close()
 
-            Rectangle {
-                id: card
-
-                anchors.fill: parent
-                anchors.margins: 5
-                radius: Theme.rowRadius
-                color: cell.tp.base
-                border.width: 2
-                border.color: cell.index === root.selectedIndex
-                    ? Theme.mauve
-                    : (cell.isCurrent ? Theme.overlay0 : "transparent")
-
-                Behavior on border.color {
-                    ColorAnimation { duration: Theme.animFast }
+                Keys.onPressed: event => {
+                    if (event.modifiers & Qt.ControlModifier) {
+                        if (event.key === Qt.Key_N) {
+                            root.moveSelection(1);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_P) {
+                            root.moveSelection(-1);
+                            event.accepted = true;
+                        }
+                    }
                 }
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 8
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Search themes"
+                    color: Theme.overlay0
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 15
+                    visible: search.text.length === 0
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: Theme.hairline
+            visible: false
+        }
+
+        // ---------- themes ----------
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.topMargin: Theme.gap
+
+            ListView {
+                id: resultsView
+
+                anchors.fill: parent
+                clip: true
+                currentIndex: root.selectedIndex
+                highlightMoveDuration: 0
+                boundsBehavior: Flickable.StopAtBounds
+                model: root.filtered
+
+                delegate: Rectangle {
+                    id: row
+
+                    required property var modelData
+                    required property int index
+
+                    readonly property var theme: Themes.get(row.modelData)
+                    readonly property var p: theme.palette
+                    readonly property bool isCurrent: row.modelData === ThemeManager.currentId
+
+                    width: resultsView.width
+                    height: Theme.rowHeight
+                    radius: Theme.rowRadius
+                    color: ListView.isCurrentItem ? Theme.itemSelected : "transparent"
 
                     RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 10
+                        spacing: 14
 
-                        Text {
+                        // Palette preview: four accent swatches in a single row.
+                        // FIXED size on purpose -- a Grid whose size depends on its
+                        // children pinned a core at 100% (that was the earlier spin).
+                        Grid {
+                            Layout.alignment: Qt.AlignVCenter
+                            columns: 4
+                            spacing: 3
+
+                            Repeater {
+                                model: [row.p.mauve, row.p.blue, row.p.green, row.p.red]
+
+                                Rectangle {
+                                    width: 14
+                                    height: 14
+                                    radius: 3
+                                    color: modelData
+                                }
+                            }
+                        }
+
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: cell.theme.name
-                            color: cell.tp.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.bold: true
-                            elide: Text.ElideRight
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 2
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: row.theme.name
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.bold: true
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: row.modelData
+                                color: Theme.overlay0
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
                         }
 
                         Text {
-                            visible: cell.isCurrent
+                            Layout.alignment: Qt.AlignVCenter
+                            visible: row.isCurrent
                             text: "\uF00C"
                             color: Theme.mauve
                             font.family: Theme.fontFamily
-                            font.pixelSize: 12
+                            font.pixelSize: 14
                         }
                     }
 
-                    // palette: two rows of six
-                    Grid {
-                        id: swatches
-
-                        Layout.fillWidth: true
-                        columns: 6
-                        spacing: 4
-
-                        readonly property real sw: (width - (columns - 1) * spacing) / columns
-
-                        Repeater {
-                            model: [
-                                cell.tp.red, cell.tp.peach, cell.tp.yellow,
-                                cell.tp.green, cell.tp.teal, cell.tp.blue,
-                                cell.tp.mauve, cell.tp.pink, cell.tp.text,
-                                cell.tp.subtext, cell.tp.surface0, cell.tp.surface1
-                            ]
-
-                            Rectangle {
-                                width: swatches.sw
-                                height: 16
-                                radius: 4
-                                color: modelData
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillHeight: true }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onEntered: root.selectedIndex = cell.index
-                    onClicked: {
-                        root.selectedIndex = cell.index;
-                        root.activateSelection();
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onEntered: root.selectedIndex = row.index
+                        onClicked: root.activateIndex(row.index)
                     }
                 }
+            }
+
+            Text {
+                anchors.centerIn: parent
+                width: parent.width - 40
+                visible: root.filtered.length === 0
+                text: "No themes match"
+                color: Theme.overlay0
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                horizontalAlignment: Text.AlignHCenter
             }
         }
     }

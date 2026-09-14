@@ -34,6 +34,30 @@ const all = {
 			pink: "#f5c2e7"
 		}
 	},
+	"catppuccin-latte": {
+		name: "Catppuccin Latte",
+		palette: {
+			crust: "#dce0e8",
+			mantle: "#e6e9ef",
+			base: "#eff1f5",
+			hairline: "#ccd0da",
+			itemHover: "#e6e9ef",
+			itemSelected: "#ccd0da",
+			surface0: "#ccd0da",
+			surface1: "#bcc0cc",
+			text: "#4c4f69",
+			subtext: "#6c6f85",
+			overlay0: "#9ca0b0",
+			red: "#d20f39",
+			peach: "#fe640b",
+			yellow: "#df8e1d",
+			green: "#40a02b",
+			teal: "#179299",
+			blue: "#1e66f5",
+			mauve: "#8839ef",
+			pink: "#ea76cb"
+		}
+	},
 	"everforest": {
 		name: "Everforest",
 		palette: {

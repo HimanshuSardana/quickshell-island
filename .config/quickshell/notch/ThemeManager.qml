@@ -33,6 +33,7 @@ Singleton {
         writeFile(configDir + "/kitty/theme.conf", ThemeGen.kitty(t.palette, t.name));
         writeFile(configDir + "/nvim/notch-palette.lua", ThemeGen.nvimPalette(t.palette));
         writeFile(home + "/.tmux-theme.conf", ThemeGen.tmux(t.palette, t.name));
+        writeFile(home + "/.zsh-theme.zsh", ThemeGen.zsh(t.palette, t.name));
         // A single stable pi theme file: pi hot reloads the active theme file
         // when it is rewritten, so keep the name fixed at "notch".
         writeFile(home + "/.pi/agent/themes/notch.json", ThemeGen.pi(t.palette, "notch"));

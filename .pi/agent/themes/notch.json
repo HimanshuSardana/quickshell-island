@@ -2,22 +2,22 @@
   "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
   "name": "notch",
   "vars": {
-    "mauve": "#c4a7e7",
-    "blue": "#9ccfd8",
-    "sky": "#9ccfd8",
-    "pink": "#eb6f92",
-    "red": "#eb6f92",
-    "peach": "#ebbcba",
-    "yellow": "#f6c177",
-    "green": "#31748f",
-    "teal": "#9ccfd8",
-    "text": "#e0def4",
-    "subtext": "#908caa",
-    "overlay": "#6e6a86",
-    "surface1": "#403d52",
-    "surface0": "#26233a",
-    "base": "#14121f",
-    "mantle": "#191724"
+    "mauve": "#d699b6",
+    "blue": "#7fbbb3",
+    "sky": "#83c092",
+    "pink": "#d699b6",
+    "red": "#e67e80",
+    "peach": "#e69875",
+    "yellow": "#dbbc7f",
+    "green": "#a7c080",
+    "teal": "#83c092",
+    "text": "#d3c6aa",
+    "subtext": "#9da9a0",
+    "overlay": "#859289",
+    "surface1": "#475258",
+    "surface0": "#343f44",
+    "base": "#232a2e",
+    "mantle": "#272e33"
   },
   "colors": {
     "accent": "mauve",
@@ -76,8 +76,8 @@
     "bashMode": "peach"
   },
   "export": {
-    "pageBg": "#14121f",
-    "cardBg": "#191724",
-    "infoBg": "#26233a"
+    "pageBg": "#232a2e",
+    "cardBg": "#272e33",
+    "infoBg": "#343f44"
   }
 }
