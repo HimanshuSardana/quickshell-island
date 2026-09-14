@@ -37,6 +37,8 @@ FocusScope {
     readonly property string nameOf: ""
 
     function takeInitialFocus() {
+        // clear the TextInput itself, not just `query` (see WifiPanel)
+        search.text = "";
         query = "";
         selectedIndex = 0;
         message = "";

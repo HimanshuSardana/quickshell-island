@@ -37,8 +37,20 @@ FocusScope {
     }
 
     function takeInitialFocus() {
+        // always start from a clean slate: a query typed before the panel was
+        // closed must not survive into the next open
+        search.text = "";
+        query = "";
+        selectedIndex = 0;
         search.forceActiveFocus(Qt.TabFocusReason);
         refresh();
+    }
+
+    onVisibleChanged: {
+        if (!visible) {
+            search.text = "";
+            selectedIndex = 0;
+        }
     }
 
     function moveSelection(delta) {

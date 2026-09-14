@@ -38,8 +38,19 @@ FocusScope {
     }
 
     function takeInitialFocus() {
+        // same as the bookmarks panel: clear any query left over from last time
+        search.text = "";
+        query = "";
+        selectedIndex = 0;
         search.forceActiveFocus(Qt.TabFocusReason);
         refresh();
+    }
+
+    onVisibleChanged: {
+        if (!visible) {
+            search.text = "";
+            selectedIndex = 0;
+        }
     }
 
     function moveSelection(delta) {

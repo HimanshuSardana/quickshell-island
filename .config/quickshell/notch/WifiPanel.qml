@@ -37,6 +37,9 @@ FocusScope {
 
     function takeInitialFocus() {
         stage = "list";
+        // clear the TextInput itself, not just `query`: query is set *from*
+        // search.text, so clearing only query left the old text in the box
+        search.text = "";
         query = "";
         selectedIndex = 0;
         message = "";
