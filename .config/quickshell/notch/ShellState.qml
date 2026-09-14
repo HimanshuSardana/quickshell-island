@@ -62,9 +62,10 @@ Singleton {
     readonly property int osdHeight: 42
     readonly property int expandedWidth: 588
 
-    // The launcher reports its own height so the island can shrink to fit a
-    // short result list instead of always using the full panel height.
+    // The launcher and themes panels report their own height so the island can
+    // shrink to fit a short list instead of always using the full panel height.
     property int launcherHeight: 360
+    property int themesHeight: 360
 
     // Fixed heights per panel. The island animates to a constant target so the
     // tween never fights live content (that was the original stutter), and each
@@ -83,14 +84,32 @@ Singleton {
         ? (osdVisible ? osdHeight : collapsedHeight)
         : (panel === "screenshot"
             ? screenshotHeight
-            : (panel === "launcher" ? launcherHeight : (panelHeights[panel] || 336)))
+            : (panel === "launcher"
+                ? launcherHeight
+                : (panel === "themes" ? themesHeight : (panelHeights[panel] || 336))))
 
     function show(name) {
+        if (!isPanel(name)) {
+            console.log("notch: unknown panel '" + name + "' ignored");
+            return;
+        }
         panel = name;
     }
 
     function toggle(name) {
+        if (!isPanel(name)) {
+            console.log("notch: unknown panel '" + name + "' ignored");
+            return;
+        }
         panel = (panel === name) ? "clock" : name;
+    }
+
+    // A panel name with no implementation must never expand the island. Expanding
+    // grants the surface EXCLUSIVE keyboard focus, so an unknown name would show an
+    // empty card that swallows every keystroke in the session, with no panel visible
+    // to press Escape in.
+    function isPanel(name) {
+        return name === "clock" || panelHeights[name] !== undefined;
     }
 
     function close() {

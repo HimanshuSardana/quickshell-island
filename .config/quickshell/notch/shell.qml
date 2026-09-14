@@ -177,8 +177,34 @@ ShellRoot {
                 repeat: false
                 onTriggered: {
                     const p = activePanel();
-                    if (p)
-                        p.takeInitialFocus();
+                    if (!p || !p.visible) {
+                        // Expanded with nothing to show: never leave the island
+                        // holding the session's keyboard.
+                        console.log("notch: no visible panel for '" + ShellState.panel + "', closing");
+                        ShellState.close();
+                        return;
+                    }
+                    p.takeInitialFocus();
+                    focusVerify.restart();
+                }
+            }
+
+            // Safety net: expanding takes EXCLUSIVE keyboard focus, so if the
+            // panel then fails to take focus, every keystroke in the session
+            // would go nowhere with no visible way out. Collapse instead.
+            Timer {
+                id: focusVerify
+
+                interval: 150
+                repeat: false
+                onTriggered: {
+                    const p = activePanel();
+                    const focused = win.activeFocusItem !== null
+                        || (p && (p.activeFocus || p.activeFocusItem !== null));
+                    if (ShellState.expanded && !focused) {
+                        console.log("notch: panel '" + ShellState.panel + "' took no focus, closing");
+                        ShellState.close();
+                    }
                 }
             }
 
@@ -213,7 +239,7 @@ ShellRoot {
                 readonly property int osdWidth: 232
                 property real flare: ShellState.expanded ? 16 : 10
                 property real foot: ShellState.expanded ? 16 : 12
-                property color fill: ShellState.expanded ? Theme.crust : "#000000"
+                property color fill: Theme.crust
                 property color line: ShellState.expanded ? Theme.hairline : "transparent"
 
                 // Hidden during capture so it never lands in the shot
@@ -333,7 +359,7 @@ ShellRoot {
                         property var now: new Date()
 
                         text: Qt.formatDateTime(clock.now, "hh:mm")
-                        color: "#ffffff"
+                        color: Theme.text
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         font.letterSpacing: 0.3
