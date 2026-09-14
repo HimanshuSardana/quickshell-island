@@ -248,7 +248,7 @@ vim.api.nvim_set_keymap('v', '<leader>r', '<Plug>SnipRun', { silent = true })
 vim.api.nvim_set_keymap('n', '<leader>rr', ':SnipReplMemoryClean<CR>', { silent = true, desc = 'Clear REPL memory' })
 vim.api.nvim_set_keymap('n', '<leader>rt', ':SnipClose<CR>', { silent = true, desc = 'Close sniprun terminal' })
 
-vim.cmd.colorscheme("catppuccin")
+dofile(vim.fn.stdpath("config") .. "/theme.lua")
 require("mason").setup()
 require("coderabbit").setup()
 require("oil").setup()

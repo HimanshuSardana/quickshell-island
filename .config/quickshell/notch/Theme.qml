@@ -4,37 +4,40 @@ import Quickshell
 
 // Design tokens.
 //
-// The palette is deliberately quiet: surfaces differ by only a few percent
-// lightness, and a single accent (mauve) is reserved for the one thing that
+// Colors come from the active palette in ThemeManager, so switching themes
+// restyles the whole shell live. Surfaces differ by only a few percent
+// lightness and a single accent (mauve) is reserved for the one thing that
 // actually wants attention. Everything else is neutral text at three weights
 // of emphasis: text -> subtext -> overlay0.
 Singleton {
     readonly property string fontFamily: "Iosevka Nerd Font Mono"
 
+    readonly property var p: ThemeManager.palette
+
     // surfaces, darkest first
-    readonly property color crust:        "#11111b"
-    readonly property color mantle:       "#181825"
-    readonly property color base:         "#1e1e2e"
-    readonly property color hairline:     "#232336"
-    readonly property color itemHover:    "#1a1a29"
-    readonly property color itemSelected: "#26263a"
-    readonly property color surface0:     "#313244"
-    readonly property color surface1:     "#45475a"
+    readonly property color crust:        p.crust
+    readonly property color mantle:       p.mantle
+    readonly property color base:         p.base
+    readonly property color hairline:     p.hairline
+    readonly property color itemHover:    p.itemHover
+    readonly property color itemSelected: p.itemSelected
+    readonly property color surface0:     p.surface0
+    readonly property color surface1:     p.surface1
 
     // text emphasis
-    readonly property color text:    "#cdd6f4"
-    readonly property color subtext: "#a6adc8"
-    readonly property color overlay0: "#6c7086"
+    readonly property color text:    p.text
+    readonly property color subtext: p.subtext
+    readonly property color overlay0: p.overlay0
 
     // accent + states
-    readonly property color mauve:  "#cba6f7"
-    readonly property color blue:   "#89b4fa"
-    readonly property color green:  "#a6e3a1"
-    readonly property color red:    "#f38ba8"
-    readonly property color yellow: "#f9e2af"
-    readonly property color teal:   "#94e2d5"
-    readonly property color peach:  "#fab387"
-    readonly property color pink:   "#f5c2e7"
+    readonly property color mauve:  p.mauve
+    readonly property color blue:   p.blue
+    readonly property color green:  p.green
+    readonly property color red:    p.red
+    readonly property color yellow: p.yellow
+    readonly property color teal:   p.teal
+    readonly property color peach:  p.peach
+    readonly property color pink:   p.pink
 
     // rhythm
     readonly property int searchHeight: 48

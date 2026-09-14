@@ -12,7 +12,7 @@ import qs
 //   expanded  : rounded card that grows into the requested panel
 //
 // Panels: launcher (SUPER+A), clipboard (SUPER+C), bookmarks (ALT+B),
-// youtube (ALT+Y).
+// youtube (ALT+Y), themes (SUPER+T).
 // Driven from the compositor:
 //   qs -c notch ipc call notch toggle launcher
 //   qs -c notch ipc call notch toggle clipboard
@@ -38,6 +38,10 @@ ShellRoot {
 
         function lock() {
             ShellState.locked = true;
+        }
+
+        function theme(id: string) {
+            ThemeManager.activate(id);
         }
 
         function volume(action: string) {
@@ -184,6 +188,7 @@ ShellRoot {
                 case "clipboard":  return clipboardPanel;
                 case "bookmarks":  return bookmarksPanel;
                 case "youtube":    return youtubePanel;
+                case "themes":     return themesPanel;
                 case "screenshot": return screenshotPanel;
                 case "power":      return powerPanel;
                 }
@@ -457,6 +462,14 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "youtube"
+                    }
+
+                    ThemesPanel {
+                        id: themesPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "themes"
                     }
 
                     ScreenshotPanel {

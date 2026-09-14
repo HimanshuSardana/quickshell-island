@@ -74,6 +74,7 @@ Singleton {
         clipboard: 360,
         bookmarks: 360,
         youtube: 360,
+        themes: 360,
         screenshot: 104,
         power: 104
     })
