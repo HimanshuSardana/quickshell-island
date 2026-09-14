@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# wallpaper - control the Wayland wallpaper through awww.
+#
+#   wallpaper ~/personal/walls/foo.png    set an image
+#   wallpaper restore                     re-apply the last image
+#   wallpaper                             same as restore
+#   wallpaper --clear 1e1e2e              fill every output with a colour (rrggbb)
+#
+# The daemon is started if it isn't already up, and this waits until it answers,
+# so the same command is safe to use interactively and from a compositor
+# autostart line where awww-daemon may still be starting.
+set -euo pipefail
+
+IMG_OPTS=(--resize crop --transition-type grow --transition-duration 0.8 --transition-fps 60 --transition-pos 0.5,0.5)
+
+usage() {
+  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+  exit 0
+}
+
+die() {
+  echo "wallpaper: $*" >&2
+  exit 1
+}
+
+command -v awww >/dev/null 2>&1 || die "awww is not installed (sudo pacman -S awww)"
+
+# Wait for the daemon to accept commands, starting it if needed.
+ensure_daemon() {
+  awww query >/dev/null 2>&1 && return 0
+  command -v awww-daemon >/dev/null 2>&1 || die "awww-daemon is not installed"
+  # setsid + redirected stdio so it survives this script exiting
+  setsid awww-daemon >/dev/null 2>&1 </dev/null &
+  for _ in $(seq 1 50); do
+    awww query >/dev/null 2>&1 && return 0
+    sleep 0.1
+  done
+  die "awww-daemon did not come up"
+}
+
+case "${1:-restore}" in
+  -h|--help)
+    usage
+    ;;
+  restore)
+    ensure_daemon
+    # no cache on a fresh machine is not an error
+    awww restore >/dev/null 2>&1 || true
+    ;;
+  --clear|-c)
+    ensure_daemon
+    awww clear "${2:?usage: wallpaper --clear <rrggbb>}"
+    ;;
+  *)
+    ensure_daemon
+    awww img "${IMG_OPTS[@]}" "$@"
+    ;;
+esac
