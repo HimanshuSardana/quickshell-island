@@ -1,5 +1,7 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pam
 import qs
@@ -20,10 +22,47 @@ WlSessionLock {
     WlSessionLockSurface {
         id: surface
 
-        color: Theme.crust
+        color: "transparent"
 
         property string errorText: ""
         property bool attempting: false
+
+        // Wallpaper shown behind the lock UI, blurred. It is pulled from awww
+        // (the same source the wallpaper panel drives) each time the lock
+        // surface appears, so it always matches the live wallpaper.
+        property string wallpaperPath: ""
+
+        Process {
+            id: wallpaperProc
+
+            command: ["awww", "query"]
+            running: false
+
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    // awww prints one line per output:
+                    //   : eDP-1: 1920x1080, scale: 1, currently displaying: image: /path
+                    // Prefer the line for this surface's output, fall back to
+                    // the first one.
+                    const want = surface.screen ? surface.screen.name : "";
+                    let first = "";
+                    for (const line of text.split("\n")) {
+                        const m = line.match(/currently displaying: image: (.+)/);
+                        if (!m)
+                            continue;
+                        const path = m[1].trim();
+                        if (first === "")
+                            first = path;
+                        const out = line.match(/^:\s*([^:]+):/);
+                        if (out && want.length > 0 && out[1].trim() === want) {
+                            surface.wallpaperPath = path;
+                            return;
+                        }
+                    }
+                    surface.wallpaperPath = first;
+                }
+            }
+        }
 
         function focusInput() {
             input.forceActiveFocus(Qt.ActiveWindowFocusReason);
@@ -48,8 +87,14 @@ WlSessionLock {
             focusInput();
         }
 
-        Component.onCompleted: focusInput()
-        onVisibleChanged: if (visible) focusInput()
+        Component.onCompleted: {
+            focusInput();
+            wallpaperProc.running = true;
+        }
+        onVisibleChanged: if (visible) {
+            focusInput();
+            wallpaperProc.running = true;
+        }
 
         PamContext {
             id: pam
@@ -78,6 +123,43 @@ WlSessionLock {
                 console.log("notch-lock: pam error=" + error);
                 surface.fail("Authentication error");
             }
+        }
+
+        // ---------------- blurred backdrop ----------------
+        // The compositor will not blur a session-lock surface (Mango only
+        // creates blur nodes for clients/layers and never advertises
+        // ext-background-effect-v1), so the frosted glass is rendered here as
+        // a blurred copy of the wallpaper.
+        Image {
+            id: wallpaperImage
+
+            anchors.fill: parent
+            source: surface.wallpaperPath.length > 0
+                ? "file://" + surface.wallpaperPath
+                : ""
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: true
+            visible: false
+        }
+
+        MultiEffect {
+            anchors.fill: parent
+            source: wallpaperImage
+            visible: wallpaperImage.status === Image.Ready
+            blurEnabled: true
+            blur: 1.0
+            blurMax: 64
+            brightness: -0.2
+            saturation: -0.1
+        }
+
+        // Dark wash so the clock and password field stay readable over any
+        // wallpaper. Fully opaque when there is no wallpaper to blur.
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.crust
+            opacity: wallpaperImage.status === Image.Ready ? 0.4 : 1.0
         }
 
         // ---------------- clock ----------------

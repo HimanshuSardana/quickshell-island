@@ -42,7 +42,9 @@ FocusScope {
         query = "";
         selectedIndex = 0;
         message = "";
-        root.forceActiveFocus(Qt.TabFocusReason);
+        // Focus the search field itself: the Ctrl-n/p handlers live on it, so
+        // focusing only the FocusScope left every keystroke going nowhere.
+        search.forceActiveFocus(Qt.TabFocusReason);
         refresh();
     }
 
@@ -138,7 +140,33 @@ FocusScope {
         root.devices = out;
     }
 
+    // A changed filter can leave the old selection past the end of the list.
+    onQueryChanged: selectedIndex = 0
+
     Keys.onEscapePressed: ShellState.show("utilities")
+
+    // Fallback bindings for when focus rests on the FocusScope rather than the
+    // search field (e.g. after clicking a row). The search field's own handlers
+    // accept the event first, so these only run when it is not focused.
+    Keys.onDownPressed: moveSelection(1)
+    Keys.onUpPressed: moveSelection(-1)
+    Keys.onReturnPressed: activateSelection()
+    Keys.onEnterPressed: activateSelection()
+
+    Keys.onPressed: event => {
+        if (event.modifiers & Qt.ControlModifier) {
+            if (event.key === Qt.Key_N) {
+                moveSelection(1);
+                event.accepted = true;
+            } else if (event.key === Qt.Key_P) {
+                moveSelection(-1);
+                event.accepted = true;
+            } else if (event.key === Qt.Key_R) {
+                scan();
+                event.accepted = true;
+            }
+        }
+    }
 
     Process {
         id: showProc

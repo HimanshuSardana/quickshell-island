@@ -252,6 +252,8 @@ ShellRoot {
                 case "themes":     return themesPanel;
                 case "screenshot": return screenshotPanel;
                 case "power":      return powerPanel;
+                case "media":      return mprisPanel;
+                case "visualizer": return visualizerPanel;
                 case "utilities":  return utilitiesPanel;
                 case "wifi":       return wifiPanel;
                 case "bluetooth":  return bluetoothPanel;
@@ -618,6 +620,22 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "power"
+                    }
+
+                    MprisPanel {
+                        id: mprisPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "media"
+                    }
+
+                    VisualizerPanel {
+                        id: visualizerPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "visualizer"
                     }
 
                     UtilitiesPanel {

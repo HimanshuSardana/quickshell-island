@@ -5,6 +5,7 @@ import Quickshell
 Singleton {
     // "clock" | "launcher" | "clipboard" | "bookmarks" | "youtube" | "themes"
     // | "utilities" | "wifi" | "bluetooth" | "wallpapers" | "screenshot" | "power"
+    // | "media" | "visualizer"
     property string panel: "clock"
     readonly property bool expanded: panel !== "clock"
 
@@ -83,12 +84,14 @@ Singleton {
         bookmarks: 360,
         youtube: 360,
         themes: 360,
-        utilities: 136,
+        utilities: 360,
         wifi: 360,
         bluetooth: 360,
         wallpapers: 360,
         screenshot: 104,
-        power: 104
+        power: 152,
+        media: 200,
+        visualizer: 180
     })
 
     readonly property int targetHeight: !expanded

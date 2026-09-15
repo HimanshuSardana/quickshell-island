@@ -1,14 +1,6 @@
 Dev	OpenCode Usage	https://opencode.ai/workspace/wrk_01KMN918DJVDDTF4RECQW3EBWP/go	opencode
-Dev	Quickshell docs	https://quickshell.org/docs/	qml
-Dev	Quickshell GitHub	https://github.com/quickshell-mirror/quickshell	qml
-Dev	Arch Wiki	https://wiki.archlinux.org/	arch
-Dev	Neovim docs	https://neovim.io/doc/user/	nvim
-Dev	vim.pack guide	https://neovim.io/doc/user/pack/	nvim
-Dev	Catppuccin palette	https://github.com/catppuccin/catppuccin	theme
-Reading	Hacker News	https://news.ycombinator.com/	news
-Reading	Lobsters	https://lobste.rs/	news
-Tools	fzf-lua options	https://github.com/ibhagwan/fzf-lua/blob/main/OPTIONS.md	fzf
-Tools	yay (AUR helper)	https://github.com/Jguer/yay	aur
-Tools	blink.cmp	https://cmp.saghen.dev/	nvim
-Tools	zoxide	https://github.com/ajeetdsouza/zoxide	shell
+Dev	My GitHub	https://github.com/HimanshuSardana	github	
+Mail	himanshusardana2005@gmail.com	https://mail.google.com/mail/u/0/#inbox	email
+Mail	hsardana_be23@thapar.edu	https://mail.google.com/mail/u/1/#inbox	email
+Mail	himanshusardana007@gmail.com	https://mail.google.com/mail/u/2/#inbox	email
 College	RecruitSage	https://recruit.thapar.edu	study

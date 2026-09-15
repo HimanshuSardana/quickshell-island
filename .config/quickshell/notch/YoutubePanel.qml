@@ -6,7 +6,8 @@ import Quickshell.Widgets
 import qs
 
 // YouTube search. Type a query, yt-dlp returns the top matches, and Enter plays
-// the selected video in mpv with --ytdl-format=best.
+// the selected video in mpv at up to 720p (video+audio merged, falling back to
+// the best pre-merged stream when no separate tracks are available).
 FocusScope {
     id: root
 
@@ -90,9 +91,15 @@ FocusScope {
         const id = entries[i].id;
         // Force the Wayland context: the shell inherits DISPLAY from the
         // session, and mpv would otherwise pick X11 and never map a window.
-        // No --ytdl-format: mpv's default selector works, whereas "best"
-        // is unavailable for many YouTube videos (mpv then exits with an error).
-        Quickshell.execDetached(["mpv", "--gpu-context=wayland", "https://www.youtube.com/watch?v=" + id]);
+        // The format selector asks for separate video+audio up to 720p and
+        // falls back to a single best stream <= 720p when only muxed formats
+        // exist. Passed as its own argv entry, so the brackets need no quoting.
+        Quickshell.execDetached([
+            "mpv",
+            "--gpu-context=wayland",
+            "--ytdl-format=bestvideo[height<=720]+bestaudio/best[height<=720]",
+            "https://www.youtube.com/watch?v=" + id
+        ]);
         ShellState.close();
     }
 
