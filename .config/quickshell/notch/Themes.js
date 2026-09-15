@@ -201,6 +201,30 @@ const all = {
 			mauve: "#be95ff",
 			pink: "#c8a5ff"
 		}
+	},
+	"nord": {
+		name: "Nord",
+		palette: {
+			crust: "#2e3440",
+			mantle: "#343b4c",
+			base: "#3b4252",
+			hairline: "#434c5e",
+			itemHover: "#3f475b",
+			itemSelected: "#434c5e",
+			surface0: "#434c5e",
+			surface1: "#4c566a",
+			text: "#eceff4",
+			subtext: "#d8dee9",
+			overlay0: "#7b88a1",
+			red: "#bf616a",
+			peach: "#d08770",
+			yellow: "#ebcb8b",
+			green: "#a3be8c",
+			teal: "#88c0d0",
+			blue: "#81a1c1",
+			mauve: "#b48ead",
+			pink: "#b48ead"
+		}
 	}
 }
 
