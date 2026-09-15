@@ -15,7 +15,7 @@
     "subtext": "#dfdfe0",
     "overlay": "#7b7b7b",
     "surface1": "#484848",
-    "surface0": "#2a2a2a",
+    "surface0": "#3a3a3a",
     "base": "#161616",
     "mantle": "#1e1e1e"
   },
@@ -78,6 +78,6 @@
   "export": {
     "pageBg": "#161616",
     "cardBg": "#1e1e1e",
-    "infoBg": "#2a2a2a"
+    "infoBg": "#3a3a3a"
   }
 }

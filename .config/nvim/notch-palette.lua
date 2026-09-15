@@ -2,7 +2,7 @@
 return {
 	bg = "#282828",
 	bg_dark = "#161616",
-	surface = "#2a2a2a",
+	surface = "#3a3a3a",
 	overlay = "#484848",
 	border = "#2a2a2a",
 	fg = "#f2f4f8",
@@ -16,5 +16,5 @@ return {
 	blue = "#78a9ff",
 	purple = "#be95ff",
 	pink = "#c8a5ff",
-	selection = "#2a2a2a",
+	selection = "#3a3a3a",
 }
