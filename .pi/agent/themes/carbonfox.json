@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
-  "name": "notch",
+  "name": "carbonfox",
   "vars": {
     "mauve": "#be95ff",
     "blue": "#78a9ff",

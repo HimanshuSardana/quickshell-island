@@ -177,6 +177,30 @@ const all = {
 			mauve: "#c678dd",
 			pink: "#c678dd"
 		}
+	},
+	"carbonfox": {
+		name: "CarbonFox",
+		palette: {
+			crust: "#161616",
+			mantle: "#1e1e1e",
+			base: "#282828",
+			hairline: "#2a2a2a",
+			itemHover: "#202020",
+			itemSelected: "#2a2a2a",
+			surface0: "#2a2a2a",
+			surface1: "#484848",
+			text: "#f2f4f8",
+			subtext: "#dfdfe0",
+			overlay0: "#7b7b7b",
+			red: "#ee5396",
+			peach: "#f16da6",
+			yellow: "#08bdba",
+			green: "#25be6a",
+			teal: "#33b1ff",
+			blue: "#78a9ff",
+			mauve: "#be95ff",
+			pink: "#c8a5ff"
+		}
 	}
 }
 

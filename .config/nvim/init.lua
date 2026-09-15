@@ -4,7 +4,7 @@ vim.opt.relativenumber = true
 vim.opt.cursorline = true
 vim.opt.path:append("**")
 vim.opt.clipboard = "unnamedplus"
-vim.opt.winborder = "bold"
+vim.opt.winborder = "none"
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 vim.opt.signcolumn = "yes:1"
