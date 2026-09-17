@@ -49,6 +49,11 @@ ShellRoot {
             ShellState.locked = true;
         }
 
+        // Caffeine mode: inhibit idle/sleep so the session never auto-locks.
+        function caffeine() {
+            ShellState.caffeine = !ShellState.caffeine;
+        }
+
         // Toggle the collapsed pill on/off (SUPER+period style manual hide).
         function toggleNotch() {
             ShellState.notchHidden = !ShellState.notchHidden;
@@ -114,6 +119,15 @@ ShellRoot {
 
     LockScreen {}
 
+    // Caffeine keeper: while ShellState.caffeine is true this holds a
+    // logind inhibitor for idle + sleep, so the session neither auto-locks
+    // (compositor idle) nor suspends. Killing the shell releases it.
+    Process {
+        id: caffeineKeeper
+        command: ["systemd-inhibit", "--what=idle:sleep", "--who=notch", "--why=Caffeine mode", "sleep", "infinity"]
+        running: ShellState.caffeine
+    }
+
     // Region selection overlay: one per screen, driven by ShellState so the
     // screenshot panel can consume the geometry.
     Variants {
@@ -178,6 +192,13 @@ ShellRoot {
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "notch"
             WlrLayershell.keyboardFocus: (ShellState.expanded && !ShellState.capturing) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+            // Caffeine mode: Wayland idle-inhibit bound to this surface, so
+            // the compositor never considers the session idle while on.
+            IdleInhibitor {
+                window: win
+                enabled: ShellState.caffeine
+            }
 
             // Focused fullscreen client, straight from wlr-foreign-toplevel
             // (Mango implements it), so this is event-driven rather than polled.
@@ -260,6 +281,7 @@ ShellRoot {
                 case "youtube":    return youtubePanel;
                 case "themes":     return themesPanel;
                 case "screenshot": return screenshotPanel;
+                case "screenrecord": return screenRecordPanel;
                 case "power":      return powerPanel;
                 case "media":      return mprisPanel;
                 case "visualizer": return visualizerPanel;
@@ -401,6 +423,36 @@ ShellRoot {
 
                     Behavior on opacity {
                         NumberAnimation { duration: Theme.animFast }
+                    }
+
+                    // recording indicator, left of everything
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        visible: ShellState.recording
+
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 9
+                            height: 9
+                            radius: 4.5
+                            color: Theme.red
+
+                            SequentialAnimation on opacity {
+                                loops: Animation.Infinite
+                                running: ShellState.recording
+                                NumberAnimation { to: 0.2; duration: 600; easing.type: Easing.InOutQuad }
+                                NumberAnimation { to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+                            }
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: ShellState.recordingClock
+                            color: Theme.red
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                        }
                     }
 
                     // battery, left of the time
@@ -629,6 +681,14 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "screenshot"
+                    }
+
+                    ScreenRecordPanel {
+                        id: screenRecordPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "screenrecord"
                     }
 
                     PowerPanel {

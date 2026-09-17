@@ -18,6 +18,11 @@ Singleton {
     // Session lock (ext-session-lock-v1, driven by LockScreen.qml)
     property bool locked: false
 
+    // Caffeine mode: when true, idle/lock is inhibited via IdleInhibitor
+    // (shell.qml) + a systemd-inhibit keeper for sleep/idle. Toggled from
+    // the utilities menu (SUPER+period).
+    property bool caffeine: false
+
     // Manual hide for the collapsed pill (alt+space). Suppresses only the
     // collapsed state; expanded panels and the OSD still appear.
     property bool notchHidden: false
@@ -48,6 +53,28 @@ Singleton {
     // The screenshot panel resizes itself between its two stages.
     property int screenshotHeight: 104
 
+    // ---- screen recording (wf-recorder, via ScreenRecordPanel.qml) ----
+    property bool recording: false
+    property string recordingFile: ""
+    property double recordingStart: 0
+    property int recordingElapsed: 0
+
+    readonly property string recordingClock: {
+        const m = Math.floor(recordingElapsed / 60);
+        const s = recordingElapsed % 60;
+        return (m < 10 ? "0" + m : "" + m) + ":" + (s < 10 ? "0" + s : "" + s);
+    }
+
+    // Elapsed recording clock, ticked while a recording is active.
+    Timer {
+        id: recTimer
+
+        interval: 1000
+        repeat: true
+        running: ShellState.recording
+        onTriggered: ShellState.recordingElapsed = Math.max(0, Math.round((Date.now() - ShellState.recordingStart) / 1000))
+    }
+
     // ---- region selection (global layout coordinates) ----
     property bool regionSelecting: false
     property bool regionDragging: false
@@ -66,7 +93,7 @@ Singleton {
 
     // Wide/tall enough for battery + clock + cpu on the collapsed pill. The
     // height has to clear the 36px icons that flank the 12px clock.
-    readonly property int collapsedWidth: 206
+    readonly property int collapsedWidth: recording ? 286 : 206
     readonly property int collapsedHeight: 48
     readonly property int osdHeight: 42
     readonly property int expandedWidth: 588
@@ -91,6 +118,7 @@ Singleton {
         bluetooth: 360,
         wallpapers: 360,
         screenshot: 104,
+        screenrecord: 136,
         power: 152,
         media: 200,
         visualizer: 180

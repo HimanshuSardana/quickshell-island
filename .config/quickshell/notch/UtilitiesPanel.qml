@@ -6,12 +6,13 @@ import qs
 
 // Utilities menu, opened with SUPER+period. A search field sits on top; below
 // it are the services that have their own panel (wifi, bluetooth) plus local
-// toggles (blue-light filter). Picking a service switches to it, while a
-// toggle acts in place and updates its own status text.
+// toggles (blue-light filter, VPN/WARP). Picking a service switches to it,
+// while a toggle acts in place and updates its own status text.
 //
 // State comes from nmcli / bluetoothctl (both already ship on this box:
-// NetworkManager and BlueZ are the active daemons), and from pgrep for the
-// blue-light helper (hyprsunset on Hyprland, wlsunset elsewhere).
+// NetworkManager and BlueZ are the active daemons), from warp-cli for the
+// VPN toggle, and from pgrep for the blue-light helper (hyprsunset on
+// Hyprland, wlsunset elsewhere).
 FocusScope {
     id: root
 
@@ -41,22 +42,70 @@ FocusScope {
 
     readonly property string blueLightStatus: blueLightOn ? "on" : "off"
 
+    // ---- VPN / Cloudflare WARP (in-place toggle, warp-cli + ip-api.com) ----
+    property string vpnState: "..." // raw warp-cli status line
+    property bool vpnConnected: false
+    property bool vpnConnecting: false
+    property bool vpnBusy: false
+    property string vpnCity: ""
+    property string vpnCountry: ""
+
+    readonly property string vpnLocation: {
+        if (vpnCity.length > 0 && vpnCountry.length > 0)
+            return vpnCity + ", " + vpnCountry;
+        return vpnCountry;
+    }
+
+    readonly property string vpnStatus: {
+        const loc = vpnLocation.length > 0 ? " \u00B7 " + vpnLocation : "";
+        if (vpnBusy || vpnConnecting)
+            return "\u2026";
+        if (vpnState === "...")
+            return "";
+        return (vpnConnected ? "on" : "off") + loc;
+    }
+
+    // Static rows: status text is read live via statusFor() in the delegate,
+    // so status updates never replace the list model (replacing it reset the
+    // view to the top entry, e.g. right after pressing Enter on VPN).
     readonly property var entries: [
-        { key: "wifi", glyph: "\uF1EB", label: "Wi-Fi", status: wifiStatus, accent: Theme.blue },
-        { key: "bluetooth", glyph: "\uF293", label: "Bluetooth", status: btStatus, accent: Theme.mauve },
-        { key: "bluelight", glyph: "\uF186", label: "Blue Light Filter", status: blueLightStatus, accent: Theme.peach },
-        { key: "media", glyph: "\uF001", label: "Now Playing", status: "", accent: Theme.mauve },
-        { key: "visualizer", glyph: "\uF028", label: "Audio Visualizer", status: "", accent: Theme.teal }
+        { key: "wifi", glyph: "\uF1EB", label: "Wi-Fi", accent: Theme.blue },
+        { key: "bluetooth", glyph: "\uF293", label: "Bluetooth", accent: Theme.mauve },
+        { key: "vpn", glyph: "\uF023", label: "VPN \u00B7 WARP", accent: Theme.teal },
+        { key: "bluelight", glyph: "\uF186", label: "Blue Light Filter", accent: Theme.peach },
+        { key: "caffeine", glyph: "\uF0F4", label: "Caffeine Mode", accent: Theme.yellow },
+        { key: "media", glyph: "\uF001", label: "Now Playing", accent: Theme.mauve },
+        { key: "visualizer", glyph: "\uF028", label: "Audio Visualizer", accent: Theme.teal }
     ]
 
-    // Search filters the rows by label or status. Re-evaluates whenever the
-    // query changes or a status property (e.g. blueLightOn) updates.
-    readonly property var filtered: entries.filter(e => {
+    function statusFor(key) {
+        if (key === "wifi")
+            return wifiStatus;
+        if (key === "bluetooth")
+            return btStatus;
+        if (key === "vpn")
+            return vpnStatus;
+        if (key === "bluelight")
+            return blueLightStatus;
+        if (key === "caffeine")
+            return ShellState.caffeine ? "on" : "off";
+        return "";
+    }
+
+    // Search filters the rows by label or status. Rebuilt imperatively on
+    // query change only, so async status updates cannot yank the selection.
+    property var filtered: []
+
+    function rebuildFiltered() {
         const q = query.toLowerCase();
-        if (!q)
-            return true;
-        return e.label.toLowerCase().includes(q) || e.status.toLowerCase().includes(q);
-    })
+        if (!q) {
+            filtered = entries.slice();
+            return;
+        }
+        filtered = entries.filter(e => e.label.toLowerCase().includes(q) || statusFor(e.key).toLowerCase().includes(q));
+    }
+
+    Component.onCompleted: rebuildFiltered()
 
     function refresh() {
         wifiRadioProc.running = false;
@@ -67,7 +116,22 @@ FocusScope {
         btShowProc.running = true;
         btDevicesProc.running = false;
         btDevicesProc.running = true;
+        vpnStatusProc.running = false;
+        vpnStatusProc.running = true;
+        vpnIpProc.running = false;
+        vpnIpProc.running = true;
         refreshBlueLight();
+    }
+
+    function toggleVpn() {
+        if (vpnBusy)
+            return;
+        vpnBusy = true;
+        toggleVpnProc.command = (vpnConnected || vpnConnecting)
+            ? ["warp-cli", "disconnect"]
+            : ["warp-cli", "connect"];
+        toggleVpnProc.running = false;
+        toggleVpnProc.running = true;
     }
 
     function refreshBlueLight() {
@@ -94,8 +158,16 @@ FocusScope {
         if (i < 0 || i >= filtered.length)
             return;
         const entry = filtered[i];
+        if (entry.key === "vpn") {
+            toggleVpn();
+            return;
+        }
         if (entry.key === "bluelight") {
             toggleBlueLight();
+            return;
+        }
+        if (entry.key === "caffeine") {
+            ShellState.caffeine = !ShellState.caffeine;
             return;
         }
         ShellState.show(entry.key);
@@ -140,7 +212,10 @@ FocusScope {
         activateIndex(selectedIndex);
     }
 
-    onQueryChanged: selectedIndex = 0
+    onQueryChanged: {
+        rebuildFiltered();
+        selectedIndex = 0;
+    }
 
     onVisibleChanged: {
         if (!visible) {
@@ -266,6 +341,74 @@ FocusScope {
         }
     }
 
+    Process {
+        id: vpnStatusProc
+
+        command: ["sh", "-c", "warp-cli status 2>&1"]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const t = text.trim();
+                if (t.length === 0)
+                    return;
+                if (/Unable to connect.*daemon/i.test(t)) {
+                    root.vpnState = "Daemon offline";
+                    root.vpnConnected = false;
+                    root.vpnConnecting = false;
+                    return;
+                }
+                const m = t.match(/Status update:\s*(.+)/i);
+                const s = (m ? m[1] : t.split("\n")[0]).trim();
+                root.vpnState = s;
+                root.vpnConnected = /^connected/i.test(s);
+                root.vpnConnecting = /^connecting/i.test(s);
+            }
+        }
+    }
+
+    Process {
+        id: vpnIpProc
+
+        command: ["sh", "-c", "curl -s --max-time 6 'http://ip-api.com/json/?fields=status,country,city'"]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const o = JSON.parse(text);
+                    if (o && o.status === "success") {
+                        root.vpnCity = o.city || "";
+                        root.vpnCountry = o.country || "";
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: toggleVpnProc
+
+        running: false
+
+        stdout: StdioCollector { id: vpnToggleOut; waitForEnd: true }
+        stderr: StdioCollector { id: vpnToggleErr; waitForEnd: true }
+
+        onExited: (code, status) => {
+            root.vpnBusy = false;
+            vpnSettleTimer.restart();
+        }
+    }
+
+    // WARP takes a moment to settle after connect/disconnect.
+    Timer {
+        id: vpnSettleTimer
+
+        interval: 2500
+        repeat: false
+        onTriggered: root.refresh()
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -383,8 +526,8 @@ FocusScope {
 
                     Text {
                         Layout.alignment: Qt.AlignVCenter
-                        text: row.modelData.status
-                        color: row.modelData.key === "bluelight" && root.blueLightOn ? Theme.green : Theme.overlay0
+                        text: root.statusFor(row.modelData.key)
+                        color: ((row.modelData.key === "bluelight" && root.blueLightOn) || (row.modelData.key === "vpn" && root.vpnConnected) || (row.modelData.key === "caffeine" && ShellState.caffeine)) ? Theme.green : Theme.overlay0
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
 
