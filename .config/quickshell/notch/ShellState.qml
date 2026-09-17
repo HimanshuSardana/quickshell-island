@@ -3,9 +3,10 @@ import QtQuick
 import Quickshell
 
 Singleton {
-    // "clock" | "launcher" | "clipboard" | "bookmarks" | "youtube" | "themes"
+    // "clock" | "launcher" | "clipboard" | "bookmarks" | "youtube" | "mail"
+    // | "themes"
     // | "utilities" | "wifi" | "bluetooth" | "wallpapers" | "screenshot" | "power"
-    // | "media" | "visualizer"
+    // | "media" | "visualizer" | "screenrecord"
     property string panel: "clock"
     readonly property bool expanded: panel !== "clock"
 
@@ -81,6 +82,7 @@ Singleton {
     readonly property var panelHeights: ({
         launcher: 360,
         clipboard: 360,
+        mail: 360,
         bookmarks: 360,
         youtube: 360,
         themes: 360,

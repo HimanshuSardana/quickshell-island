@@ -13,7 +13,8 @@ import qs
 //   expanded  : rounded card that grows into the requested panel
 //
 // Panels: launcher (SUPER+A), clipboard (SUPER+C), bookmarks (ALT+B),
-// youtube (ALT+Y), themes (SUPER+T).
+// youtube (ALT+Y), mail (SUPER+E), themes (SUPER+T), screenshot (SUPER+S),
+// screenrecord (SUPER+SHIFT+S).
 // Driven from the compositor:
 //   qs -c notch ipc call notch toggle launcher
 //   qs -c notch ipc call notch toggle clipboard
@@ -34,6 +35,13 @@ ShellRoot {
         }
 
         function close() {
+            ShellState.close();
+        }
+
+        function openMail(id: string) {
+            // Same command the mail list's click handler runs; exposed here so
+            // the open path can be driven and tested without a pointer.
+            Quickshell.execDetached(["carbon", "open", id]);
             ShellState.close();
         }
 
@@ -247,6 +255,7 @@ ShellRoot {
                 switch (ShellState.panel) {
                 case "launcher":   return launcherPanel;
                 case "clipboard":  return clipboardPanel;
+                case "mail":       return mailPanel;
                 case "bookmarks":  return bookmarksPanel;
                 case "youtube":    return youtubePanel;
                 case "themes":     return themesPanel;
@@ -580,6 +589,14 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         visible: ShellState.panel === "clipboard"
+                    }
+
+                    MailPanel {
+                        id: mailPanel
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: ShellState.panel === "mail"
                     }
 
                     BookmarksPanel {
